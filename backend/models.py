@@ -10,7 +10,7 @@ Document      -> a PDF the faculty has uploaded & indexed into ChromaDB
 QuizAttempt   -> one graded quiz question a student answered (drives progress)
 """
 
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 from database import Base
 
@@ -82,6 +82,7 @@ class DoubtHistory(Base):
     mode = Column(String, default="exam")  # "exam" or "analogy"
     answer = Column(String, nullable=False)
     citations_json = Column(String, nullable=True)  # JSON string of citations
+    top_similarity = Column(Float, nullable=True)  # Similarity score of top chunk for guardrail audit trail
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

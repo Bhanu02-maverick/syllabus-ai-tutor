@@ -548,26 +548,55 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
     fid = _resolve_faculty_id(user, req.faculty_id)
     store = get_vector_store(fid)
     
-    search_kwargs = {"k": 4}
+    filter_dict = None
     if req.unit_number is not None:
-        search_kwargs["filter"] = {"unit": int(req.unit_number)}
-
-    retriever = store.as_retriever(search_kwargs=search_kwargs)
+        filter_dict = {"unit": int(req.unit_number)}
     
     # Prepend subtopic to vector query for high-precision semantic matching
     semantic_query = req.query
     if req.subtopic and req.subtopic.strip():
         semantic_query = f"Topic: {req.subtopic.strip()} - Question: {req.query}"
         
-    docs = retriever.invoke(semantic_query)
+    # Syllabus-bound similarity score guardrail
+    results = store.similarity_search_with_relevance_scores(
+        semantic_query,
+        k=4,
+        filter=filter_dict,
+    )
 
+    SIMILARITY_THRESHOLD = 0.40  # Defensible relevance threshold for out-of-syllabus guardrail
+    top_score = float(results[0][1]) if results else 0.0
 
-    if not docs:
+    if not results or top_score < SIMILARITY_THRESHOLD:
+        rejected_answer = "This topic is outside the uploaded syllabus boundaries."
+        # Audit trail logged in DoubtHistory
+        try:
+            doubt = models.DoubtHistory(
+                user_id=user.id,
+                faculty_id=fid,
+                unit_number=req.unit_number,
+                query=req.query,
+                mode=req.mode,
+                answer=rejected_answer,
+                citations_json="[]",
+                top_similarity=round(top_score, 4),
+            )
+            db.add(doubt)
+            db.commit()
+        except Exception as e:
+            print(f"Doubt history audit save error: {e}")
+
         return schemas.AskResponse(
-            answer="This topic is outside the uploaded syllabus boundaries.",
+            answer=rejected_answer,
             citations=[],
             unit_number=None,
+            top_similarity=round(top_score, 4),
         )
+
+    # Filter context chunks by threshold
+    docs = [doc for doc, score in results if score >= SIMILARITY_THRESHOLD]
+    if not docs:
+        docs = [results[0][0]]
 
     context = "\n\n".join([d.page_content for d in docs])
     citations = [
@@ -600,7 +629,7 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
     answer_text = extract_text(response)
     resolved_unit = majority_unit(docs)
 
-    # Feature 6: Save to DoubtHistory
+    # Save to DoubtHistory with top_similarity audit trail
     try:
         doubt = models.DoubtHistory(
             user_id=user.id,
@@ -610,6 +639,7 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
             mode=req.mode,
             answer=answer_text,
             citations_json=json.dumps([c.dict() for c in citations[:2]]),
+            top_similarity=round(top_score, 4),
         )
         db.add(doubt)
         db.commit()
@@ -620,6 +650,7 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
         answer=answer_text,
         citations=citations[:2],
         unit_number=resolved_unit,
+        top_similarity=round(top_score, 4),
     )
 
 
@@ -718,7 +749,8 @@ def upload_document(
     user: models.User = Depends(require_role("faculty")),
 ):
     fid = user.id
-    dest_path = os.path.join(DOCS_DIR, file.filename)
+    # Ensure physical filename isolation across faculty accounts on disk
+    dest_path = os.path.join(DOCS_DIR, f"faculty_{fid}_{file.filename}")
     with open(dest_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
@@ -750,19 +782,37 @@ def upload_document(
     else:
         resolved_name = existing_unit.unit_name
 
+    # Check for previous versions of this document to increment version and deactivate old
+    existing_doc = db.query(models.Document).filter(
+        models.Document.filename == file.filename,
+        models.Document.unit_number == resolved_number,
+        models.Document.faculty_id == fid,
+    ).order_by(models.Document.version.desc()).first()
+
+    new_version = (existing_doc.version + 1) if existing_doc else 1
+    if existing_doc:
+        db.query(models.Document).filter(
+            models.Document.filename == file.filename,
+            models.Document.unit_number == resolved_number,
+            models.Document.faculty_id == fid,
+        ).update({"is_active": False})
+        db.commit()
+
     doc = models.Document(
         filename=file.filename,
         unit_number=resolved_number,
         unit_name=resolved_name,
         faculty_id=fid,
         status="processing",
+        version=new_version,
+        is_active=True,
     )
     db.add(doc)
     db.commit()
     db.refresh(doc)
 
     try:
-        chunk_count = ingest_pdf(dest_path, unit_number=resolved_number, unit_name=resolved_name, faculty_id=fid)
+        chunk_count = ingest_pdf(dest_path, unit_number=resolved_number, unit_name=resolved_name, faculty_id=fid, source_filename=file.filename)
         doc.status = "indexed" if chunk_count > 0 else "failed"
         doc.chunk_count = chunk_count
     except Exception as e:
@@ -1297,6 +1347,7 @@ def get_doubt_history(
             answer=d.answer,
             unit_number=d.unit_number,
             created_at=d.created_at.strftime("%Y-%m-%d %H:%M") if d.created_at else "N/A",
+            top_similarity=round(d.top_similarity, 4) if d.top_similarity is not None else None,
         )
         for d in doubts
     ]
@@ -1404,40 +1455,49 @@ def faculty_enhanced_analytics(
         correct = sum(1 for a in attempts if a.is_correct)
         avg_score = round((correct / total) * 100, 1) if total > 0 else 0.0
 
-        # Identify difficult topics from incorrect answers
-        wrong_questions = [a.question for a in attempts if not a.is_correct]
+        # Identify difficult topics directly from tagged attempt history
         difficult_topics = []
+        tagged_attempts = [a for a in attempts if a.topic_query and a.topic_query.strip()]
 
-        if wrong_questions:
-            # Group by question similarity — use LLM to extract topics
-            try:
-                sample = wrong_questions[:15]
-                prompt = (
-                    "From these exam questions students got wrong, identify the top 3-5 distinct topics "
-                    "(each max 5 words). Return ONLY a JSON array of strings.\n\n"
-                    + "\n".join(f"- {q}" for q in sample)
-                )
-                resp = safe_llm_invoke([
-                    {"role": "system", "content": "Return only a JSON array of topic strings."},
-                    {"role": "user", "content": prompt},
-                ])
-                clean = extract_text(resp).strip().replace("```json", "").replace("```", "")
-                topic_names = json.loads(clean)
+        if tagged_attempts:
+            # Direct exact measurement from attempt history
+            topic_groups = {}
+            for a in tagged_attempts:
+                t = a.topic_query.strip()
+                if t not in topic_groups:
+                    topic_groups[t] = {"total": 0, "correct": 0}
+                topic_groups[t]["total"] += 1
+                if a.is_correct:
+                    topic_groups[t]["correct"] += 1
 
-                # Estimate accuracy for each topic
-                per_topic = len(wrong_questions) // max(len(topic_names), 1)
-                for i, topic in enumerate(topic_names[:5]):
-                    topic_total = max(per_topic, total // max(len(topic_names), 1))
-                    topic_correct = max(0, topic_total - per_topic)
-                    topic_accuracy = round((topic_correct / topic_total) * 100, 1) if topic_total > 0 else 0.0
-                    difficult_topics.append(schemas.FacultyDifficultyTopic(
-                        topic=topic,
-                        total_attempts=topic_total,
-                        correct_count=topic_correct,
-                        accuracy_percent=topic_accuracy,
-                    ))
-            except Exception as e:
-                print(f"Difficulty topic extraction error: {e}")
+            # Sort by accuracy ascending (most difficult first)
+            for topic, stats in sorted(
+                topic_groups.items(),
+                key=lambda x: (x[1]["correct"] / max(1, x[1]["total"]), -x[1]["total"])
+            )[:5]:
+                topic_total = stats["total"]
+                topic_correct = stats["correct"]
+                topic_accuracy = round((topic_correct / max(1, topic_total)) * 100, 1)
+                difficult_topics.append(schemas.FacultyDifficultyTopic(
+                    topic=topic,
+                    total_attempts=topic_total,
+                    correct_count=topic_correct,
+                    accuracy_percent=topic_accuracy,
+                ))
+        elif wrong_questions:
+            # Fallback for untagged legacy attempts: exact counts per question
+            wrong_counts = Counter(wrong_questions)
+            for q_text, count in wrong_counts.most_common(5):
+                q_attempts = [a for a in attempts if a.question == q_text]
+                q_total = len(q_attempts)
+                q_correct = sum(1 for a in q_attempts if a.is_correct)
+                q_acc = round((q_correct / max(1, q_total)) * 100, 1)
+                difficult_topics.append(schemas.FacultyDifficultyTopic(
+                    topic=q_text[:40] + ("..." if len(q_text) > 40 else ""),
+                    total_attempts=q_total,
+                    correct_count=q_correct,
+                    accuracy_percent=q_acc,
+                ))
 
         results.append(schemas.FacultyEnhancedAnalyticsUnit(
             unit_number=u.unit_number,

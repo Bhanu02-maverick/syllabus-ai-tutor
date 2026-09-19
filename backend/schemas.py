@@ -56,6 +56,7 @@ class AskResponse(BaseModel):
     answer: str
     citations: List[Citation]
     unit_number: Optional[int] = None
+    top_similarity: Optional[float] = None
 
 
 class QuizRequest(BaseModel):
@@ -238,6 +239,7 @@ class DoubtHistoryItem(BaseModel):
     answer: str
     unit_number: Optional[int] = None
     created_at: str
+    top_similarity: Optional[float] = None
 
 
 class DoubtHistoryResponse(BaseModel):

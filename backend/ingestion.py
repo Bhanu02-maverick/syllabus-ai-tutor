@@ -39,7 +39,7 @@ def get_embeddings():
     return GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
 
 
-def ingest_pdf(file_path: str, unit_number: int, unit_name: str = "", faculty_id: int = 0) -> int:
+def ingest_pdf(file_path: str, unit_number: int, unit_name: str = "", faculty_id: int = 0, source_filename: str = "") -> int:
     """
     Parses, chunks, embeds, and stores a PDF in the faculty's ChromaDB.
     Uses batching + rate-limit backoff to smoothly handle large (100+ page) PDFs.
@@ -55,10 +55,11 @@ def ingest_pdf(file_path: str, unit_number: int, unit_name: str = "", faculty_id
     loader = PyPDFLoader(file_path)
     pages = loader.load()
 
+    display_name = source_filename if source_filename else os.path.basename(file_path)
     for page in pages:
         page.metadata["unit"] = unit_number
         page.metadata["unit_name"] = unit_name
-        page.metadata["source_file"] = os.path.basename(file_path)
+        page.metadata["source_file"] = display_name
         page.metadata["faculty_id"] = faculty_id
 
     # Optimal chunking for large textbook PDFs: 1000 chars per chunk reduces total embedding calls while preserving dense context
