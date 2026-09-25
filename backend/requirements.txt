@@ -12,3 +12,5 @@ langchain-text-splitters
 langchain-google-genai
 pypdf
 python-dotenv
+langchain-openai
+bcrypt==4.0.1
