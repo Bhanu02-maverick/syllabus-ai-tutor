@@ -32,6 +32,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../api";
 import ThemeToggle from "./ThemeToggle.jsx";
+import { useThemeAttribute } from "../utils/theme.js";
 import NetworkCanvas from "./NetworkCanvas.jsx";
 
 export default function FacultyDashboard({ user, onLogout }) {
@@ -39,6 +40,8 @@ export default function FacultyDashboard({ user, onLogout }) {
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("vce_faculty_theme") !== "false";
   });
+
+  useThemeAttribute(isDark);
 
   const toggleTheme = () => {
     setIsDark((prev) => {
@@ -323,38 +326,26 @@ export default function FacultyDashboard({ user, onLogout }) {
       : 0;
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
-      isDark ? "bg-[#0B1020] text-slate-100" : "bg-[#F8FAFC] text-slate-800"
-    }`}>
+    <div className="ds-page flex flex-col relative overflow-hidden">
       {/* 60 FPS HTML5 Canvas Background Particle Network */}
       <NetworkCanvas isDark={isDark} />
 
       {/* Header */}
-      <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ${
-        isDark ? "bg-slate-900/80 border-slate-800/80 backdrop-blur-md" : "bg-white/90 border-slate-200 backdrop-blur-md"
-      }`}>
+      <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ds-topbar`}>
         <div className="flex items-center space-x-3">
           {/* History Back & Forward Navigation Controls */}
           <div className="flex items-center gap-1 mr-1">
             <button
               onClick={() => window.history.back()}
               title="Go Back (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
-                isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-              }`}
+              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center bg-surface-sunken border-line text-ink-soft hover:bg-line/60 hover:text-ink`}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => window.history.forward()}
               title="Go Forward (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
-                isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-              }`}
+              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center bg-surface-sunken border-line text-ink-soft hover:bg-line/60 hover:text-ink`}
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -386,11 +377,7 @@ export default function FacultyDashboard({ user, onLogout }) {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onLogout}
-            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-2xl border transition cursor-pointer ${
-              isDark
-                ? "bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800"
-                : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-            }`}
+            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-2xl border transition cursor-pointer bg-surface-sunken border-line text-ink-soft hover:bg-line/60`}
           >
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </motion.button>
@@ -401,55 +388,45 @@ export default function FacultyDashboard({ user, onLogout }) {
       <div className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6 z-10">
         {/* Cohort Overview Metrics Banner */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
+          <div className={`p-4 rounded-2xl border transition shadow-sm ds-card`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Syllabus Units</span>
+              <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Syllabus Units</span>
               <BookOpen className="w-4 h-4 text-indigo-400" />
             </div>
             <div className="text-2xl font-black">{totalUnits}</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Indexed course units</p>
+            <p className="text-[10px] text-ink-subtle mt-0.5">Indexed course units</p>
           </div>
 
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
+          <div className={`p-4 rounded-2xl border transition shadow-sm ds-card`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Indexed PDFs</span>
+              <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Indexed PDFs</span>
               <FileText className="w-4 h-4 text-cyan-400" />
             </div>
             <div className="text-2xl font-black">{indexedDocs}</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Active textbook documents</p>
+            <p className="text-[10px] text-ink-subtle mt-0.5">Active textbook documents</p>
           </div>
 
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
+          <div className={`p-4 rounded-2xl border transition shadow-sm ds-card`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cohort Mastery</span>
+              <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Cohort Mastery</span>
               <Award className="w-4 h-4 text-emerald-400" />
             </div>
             <div className="text-2xl font-black">{overallAvgMastery}%</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Class average accuracy</p>
+            <p className="text-[10px] text-ink-subtle mt-0.5">Class average accuracy</p>
           </div>
 
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
+          <div className={`p-4 rounded-2xl border transition shadow-sm ds-card`}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Student Activity</span>
+              <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Student Activity</span>
               <Users className="w-4 h-4 text-purple-400" />
             </div>
             <div className="text-2xl font-black">{totalStudentsAttempted}</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Total quiz attempts</p>
+            <p className="text-[10px] text-ink-subtle mt-0.5">Total quiz attempts</p>
           </div>
         </div>
 
         {/* Command Deck Navigation Tabs */}
-        <div className={`flex rounded-2xl border shadow-sm overflow-x-auto relative p-1 transition ${
-          isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-        }`}>
+        <div className={`flex rounded-2xl border shadow-sm overflow-x-auto relative p-1 transition ds-card`}>
           {[
             { id: "ingest", icon: UploadCloud, label: "PDF Ingestion & Syllabus" },
             { id: "qbank", icon: FileQuestion, label: "AI Question Generator" },
@@ -464,20 +441,14 @@ export default function FacultyDashboard({ user, onLogout }) {
                 onClick={() => setActiveTab(tab.id)}
                 className={`relative flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-colors z-10 cursor-pointer ${
                   isActive
-                    ? isDark
-                      ? "text-white"
-                      : "text-blue-950"
-                    : isDark
-                    ? "text-slate-400 hover:text-slate-200"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "text-ink"
+                    : "text-ink-muted hover:text-ink"
                 }`}
               >
                 {isActive && (
                   <motion.div
                     layoutId="activeFacultyTabPill"
-                    className={`absolute inset-0 rounded-xl ${
-                      isDark ? "bg-indigo-600/40 border border-indigo-500/50 shadow-md" : "bg-blue-50 border border-blue-200 shadow-xs"
-                    }`}
+                    className={`absolute inset-0 rounded-xl ds-nav-active`}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
@@ -492,10 +463,8 @@ export default function FacultyDashboard({ user, onLogout }) {
         {activeTab === "ingest" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upload Form */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ds-card`}>
+              <div className="flex items-center gap-3 pb-3 border-b border-line">
                 <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400">
                   <UploadCloud className="w-5 h-5" />
                 </div>
@@ -511,9 +480,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                   <select
                     value={uploadUnitChoice}
                     onChange={(e) => setUploadUnitChoice(e.target.value)}
-                    className={`w-full px-4 py-2.5 rounded-xl text-xs font-semibold border transition ${
-                      isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full px-4 py-2.5 rounded-xl text-xs font-semibold border transition ds-field`}
                   >
                     <option value="__new__">+ Create a new unit for this PDF</option>
                     {units.map((u) => (
@@ -525,35 +492,29 @@ export default function FacultyDashboard({ user, onLogout }) {
                 </div>
 
                 {uploadUnitChoice === "__new__" && (
-                  <div className={`grid grid-cols-2 gap-3 p-4 rounded-2xl border ${
-                    isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                  }`}>
+                  <div className={`grid grid-cols-2 gap-3 p-4 rounded-2xl border ds-inset`}>
                     <div>
                       <label className="block text-xs font-bold mb-1 opacity-80">
-                        Unit Number <span className="text-slate-400 font-normal">(optional)</span>
+                        Unit Number <span className="text-ink-subtle font-normal">(optional)</span>
                       </label>
                       <input
                         type="number"
                         value={newUnitNumber}
                         onChange={(e) => setNewUnitNumber(e.target.value)}
                         placeholder="auto"
-                        className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                          isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-3 py-2 rounded-xl text-xs border ds-field`}
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-bold mb-1 opacity-80">
-                        Unit Name <span className="text-slate-400 font-normal">(optional)</span>
+                        Unit Name <span className="text-ink-subtle font-normal">(optional)</span>
                       </label>
                       <input
                         type="text"
                         value={newUnitName}
                         onChange={(e) => setNewUnitName(e.target.value)}
                         placeholder="auto-detect from PDF"
-                        className={`w-full px-3 py-2 rounded-xl text-xs border ${
-                          isDark ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-3 py-2 rounded-xl text-xs border ds-field`}
                       />
                     </div>
                     <p className="col-span-2 text-[11px] opacity-60">
@@ -565,17 +526,13 @@ export default function FacultyDashboard({ user, onLogout }) {
                 {/* Drag & Drop Style File Picker */}
                 <div>
                   <label className="block text-xs font-bold mb-1.5 opacity-80">Select PDF File</label>
-                  <div className={`p-6 rounded-2xl border-2 border-dashed text-center transition ${
-                    isDark
-                      ? "bg-slate-950/40 border-indigo-500/30 hover:border-indigo-500/60"
-                      : "bg-slate-50 border-indigo-200 hover:border-indigo-400"
-                  }`}>
+                  <div className={`p-6 rounded-2xl border-2 border-dashed text-center transition bg-surface-sunken border-primary/30 hover:border-primary/60`}>
                     <FileText className="w-8 h-8 text-indigo-400 mx-auto mb-2 animate-pulse" />
                     <input
                       type="file"
                       accept="application/pdf"
                       onChange={(e) => setUploadFile(e.target.files[0])}
-                      className="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+                      className="block w-full text-xs text-ink-subtle file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
                     />
                     {uploadFile && (
                       <p className="text-xs font-bold text-indigo-400 mt-2">Selected: {uploadFile.name}</p>
@@ -608,10 +565,8 @@ export default function FacultyDashboard({ user, onLogout }) {
             </div>
 
             {/* Indexed Documents Status List */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ds-card`}>
+              <div className="flex items-center justify-between pb-3 border-b border-line">
                 <div className="flex items-center gap-2.5">
                   <FileText className="w-5 h-5 text-cyan-400" />
                   <h3 className="text-base font-bold">Indexed Course Documents ({documents.length})</h3>
@@ -634,9 +589,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                 {documents.map((d) => (
                   <div
                     key={d.id}
-                    className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition ${
-                      isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                    }`}
+                    className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition ds-inset`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400">
@@ -668,10 +621,8 @@ export default function FacultyDashboard({ user, onLogout }) {
         {/* ═══════════════ TAB 2: AI QUESTION BANK GENERATOR ═══════════════ */}
         {activeTab === "qbank" && (
           <div className="space-y-6">
-            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ds-card`}>
+              <div className="flex items-center justify-between pb-3 border-b border-line">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-2xl bg-purple-500/20 text-purple-400">
                     <FileQuestion className="w-5 h-5" />
@@ -689,9 +640,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                   <select
                     value={qbUnit ?? ""}
                     onChange={(e) => setQbUnit(Number(e.target.value))}
-                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold border ${
-                      isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold border ds-field`}
                   >
                     {units.map((u) => (
                       <option key={u.unit_number} value={u.unit_number}>
@@ -706,9 +655,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                   <select
                     value={qbDifficulty}
                     onChange={(e) => setQbDifficulty(e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold border ${
-                      isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold border ds-field`}
                   >
                     <option value="easy">Easy (Fundamentals)</option>
                     <option value="medium">Medium (Standard Exam)</option>
@@ -721,9 +668,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                   <select
                     value={qbType}
                     onChange={(e) => setQbType(e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold border ${
-                      isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full px-3 py-2.5 rounded-xl text-xs font-semibold border ds-field`}
                   >
                     <option value="mcq">Multiple Choice (MCQ)</option>
                     <option value="short_answer">Short Answer Questions</option>
@@ -739,9 +684,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                       max="30"
                       value={qbCount}
                       onChange={(e) => setQbCount(Number(e.target.value))}
-                      className={`w-20 px-3 py-2.5 rounded-xl text-xs font-semibold border ${
-                        isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
-                      }`}
+                      className={`w-20 px-3 py-2.5 rounded-xl text-xs font-semibold border ds-field`}
                     />
                     <motion.button
                       whileHover={{ scale: 1.05 }}
@@ -760,10 +703,8 @@ export default function FacultyDashboard({ user, onLogout }) {
 
             {/* Generated Question Bank Display */}
             {qbResult && (
-              <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${
-                isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-              }`}>
-                <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800/40">
+              <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ds-card`}>
+                <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-line">
                   <div>
                     <h4 className="text-base font-bold">
                       Generated Assignment: Unit {qbResult.unit_number} — {qbResult.unit_name}
@@ -779,9 +720,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                       className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border transition cursor-pointer ${
                         copiedAssignment
                           ? "bg-emerald-950/80 border-emerald-800 text-emerald-400"
-                          : isDark
-                          ? "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
-                          : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
+                          : "bg-surface-sunken border-line text-ink-soft hover:bg-line/60"
                       }`}
                     >
                       {copiedAssignment ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -801,9 +740,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                   {qbResult.questions.map((q, i) => (
                     <div
                       key={i}
-                      className={`p-4 rounded-2xl border space-y-2 text-xs transition ${
-                        isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                      }`}
+                      className={`p-4 rounded-2xl border space-y-2 text-xs transition ds-inset`}
                     >
                       <p className="font-bold text-sm">
                         Q{i + 1}. {q.question}
@@ -816,9 +753,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                               className={`p-2.5 rounded-xl border font-semibold text-xs ${
                                 opt === q.answer
                                   ? "bg-emerald-950/40 border-emerald-800 text-emerald-400"
-                                  : isDark
-                                  ? "bg-slate-900 border-slate-800 text-slate-300"
-                                  : "bg-white border-slate-200 text-slate-700"
+                                  : "ds-card text-ink-soft"
                               }`}
                             >
                               <span className="opacity-60 mr-2">{String.fromCharCode(65 + oi)}.</span>
@@ -844,10 +779,8 @@ export default function FacultyDashboard({ user, onLogout }) {
         {/* ═══════════════ TAB 3: CLASSROOM ANALYTICS ═══════════════ */}
         {activeTab === "analytics" && (
           <div className="space-y-6">
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ds-card`}>
+              <div className="flex items-center justify-between pb-3 border-b border-line">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400">
                     <BarChart3 className="w-5 h-5" />
@@ -875,9 +808,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                   return (
                     <div
                       key={a.unit_number}
-                      className={`p-4 rounded-2xl border transition ${
-                        isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                      }`}
+                      className={`p-4 rounded-2xl border transition ds-inset`}
                     >
                       <button
                         onClick={() => setExpandedAnalytics(expandedAnalytics === a.unit_number ? null : a.unit_number)}
@@ -888,7 +819,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                             {enhanced && enhanced.difficult_topics.length > 0 && (
                               expandedAnalytics === a.unit_number
                                 ? <ChevronDown className="w-4 h-4 text-indigo-400" />
-                                : <ChevronRight className="w-4 h-4 text-slate-400" />
+                                : <ChevronRight className="w-4 h-4 text-ink-subtle" />
                             )}
                             Unit {a.unit_number}: {a.unit_name}
                           </span>
@@ -896,7 +827,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                             {a.average_score_percent}% average score ({a.students_attempted} student attempts)
                           </span>
                         </div>
-                        <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="w-full h-2.5 bg-line rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               a.average_score_percent >= 70
@@ -912,7 +843,7 @@ export default function FacultyDashboard({ user, onLogout }) {
 
                       {/* Expanded: Difficult Topics */}
                       {expandedAnalytics === a.unit_number && enhanced && enhanced.difficult_topics.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-slate-800/40 space-y-2">
+                        <div className="mt-4 pt-3 border-t border-line space-y-2">
                           <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">
                             Most Challenging Concepts for Students
                           </p>
@@ -920,9 +851,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                             {enhanced.difficult_topics.map((dt, i) => (
                               <div
                                 key={i}
-                                className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
-                                  isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-                                }`}
+                                className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ds-card`}
                               >
                                 <span className="font-semibold truncate max-w-[160px]">{dt.topic}</span>
                                 <span className={`font-bold text-xs ${
@@ -947,10 +876,8 @@ export default function FacultyDashboard({ user, onLogout }) {
         {activeTab === "versions" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Standalone Unit Manager */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ds-card`}>
+              <div className="flex items-center gap-3 pb-3 border-b border-line">
                 <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400">
                   <Plus className="w-5 h-5" />
                 </div>
@@ -966,18 +893,14 @@ export default function FacultyDashboard({ user, onLogout }) {
                   value={manualUnitNumber}
                   onChange={(e) => setManualUnitNumber(e.target.value)}
                   placeholder="# (auto)"
-                  className={`w-20 px-3 py-2.5 rounded-xl text-xs border ${
-                    isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
-                  }`}
+                  className={`w-20 px-3 py-2.5 rounded-xl text-xs border ds-field`}
                 />
                 <input
                   type="text"
                   value={manualUnitName}
                   onChange={(e) => setManualUnitName(e.target.value)}
                   placeholder="Unit name (e.g. Natural Language Processing)"
-                  className={`flex-1 px-3 py-2.5 rounded-xl text-xs border ${
-                    isDark ? "bg-slate-950 border-slate-800 text-white" : "bg-slate-50 border-slate-300 text-slate-900"
-                  }`}
+                  className={`flex-1 px-3 py-2.5 rounded-xl text-xs border ds-field`}
                 />
                 <button
                   type="submit"
@@ -992,14 +915,12 @@ export default function FacultyDashboard({ user, onLogout }) {
                 {units.map((u) => (
                   <div
                     key={u.unit_number}
-                    className={`p-3 rounded-2xl border flex items-center justify-between text-xs ${
-                      isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                    }`}
+                    className={`p-3 rounded-2xl border flex items-center justify-between text-xs ds-inset`}
                   >
                     <span className="font-bold">Unit {u.unit_number}: {u.unit_name}</span>
                     <button
                       onClick={() => handleDeleteUnit(u.unit_number)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                      className="p-1.5 text-ink-subtle hover:text-rose-400 transition cursor-pointer"
                       title={`Delete Unit ${u.unit_number}`}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1010,10 +931,8 @@ export default function FacultyDashboard({ user, onLogout }) {
             </div>
 
             {/* PDF Version Control */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ds-card`}>
+              <div className="flex items-center gap-3 pb-3 border-b border-line">
                 <div className="p-2.5 rounded-2xl bg-purple-500/20 text-purple-400">
                   <History className="w-5 h-5" />
                 </div>
@@ -1032,9 +951,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                     className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition cursor-pointer ${
                       versionUnit === u.unit_number
                         ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
-                        : isDark
-                        ? "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                        : "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200"
+                        : "bg-surface-sunken border-line text-ink-muted hover:bg-line/60 hover:text-ink"
                     }`}
                   >
                     Unit {u.unit_number}
@@ -1059,9 +976,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                         className={`p-3 rounded-2xl border flex items-center justify-between text-xs ${
                           v.is_active
                             ? "bg-emerald-950/40 border-emerald-800 text-emerald-300"
-                            : isDark
-                            ? "bg-slate-950/60 border-slate-800"
-                            : "bg-slate-50 border-slate-200"
+                            : "ds-inset"
                         }`}
                       >
                         <div className="min-w-0">
@@ -1080,7 +995,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                               </button>
                               <button
                                 onClick={() => handleDeleteVersion(v.id)}
-                                className="p-1 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                                className="p-1 text-ink-subtle hover:text-rose-400 transition cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

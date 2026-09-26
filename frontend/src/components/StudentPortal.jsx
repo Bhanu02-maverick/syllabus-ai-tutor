@@ -43,6 +43,7 @@ import rehypeRaw from "rehype-raw";
 import { preprocessLaTeX } from "../utils/latexHelper.js";
 import { api } from "../api";
 import ThemeToggle from "./ThemeToggle.jsx";
+import { useThemeAttribute } from "../utils/theme.js";
 import GamificationCard from "./GamificationCard.jsx";
 import AIThinking from "./AIThinking.jsx";
 import NodeActionPanel from "./NodeActionPanel.jsx";
@@ -65,33 +66,33 @@ const markdownComponents = {
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-4 mb-2">{children}</h2>
+    <h2 className="text-lg font-bold text-ink mt-4 mb-2">{children}</h2>
   ),
   h3: ({ children }) => (
     <h3 className="text-base font-bold text-indigo-800 dark:text-indigo-300 mt-3 mb-1.5">{children}</h3>
   ),
   h4: ({ children }) => (
-    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-2 mb-1">{children}</h4>
+    <h4 className="text-sm font-bold text-ink mt-2 mb-1">{children}</h4>
   ),
   p: ({ children }) => (
-    <p className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed mb-3 font-medium">{children}</p>
+    <p className="text-sm text-ink leading-relaxed mb-3 font-medium">{children}</p>
   ),
   ul: ({ children }) => (
-    <ul className="list-disc list-outside ml-5 mb-3 space-y-1.5 text-sm text-slate-800 dark:text-slate-200 font-medium">
+    <ul className="list-disc list-outside ml-5 mb-3 space-y-1.5 text-sm text-ink font-medium">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="list-decimal list-outside ml-5 mb-3 space-y-1.5 text-sm text-slate-800 dark:text-slate-200 font-medium">
+    <ol className="list-decimal list-outside ml-5 mb-3 space-y-1.5 text-sm text-ink font-medium">
       {children}
     </ol>
   ),
-  li: ({ children }) => <li className="leading-relaxed text-slate-800 dark:text-slate-200">{children}</li>,
+  li: ({ children }) => <li className="leading-relaxed text-ink">{children}</li>,
   strong: ({ children }) => (
-    <strong className="font-extrabold text-slate-950 dark:text-white">{children}</strong>
+    <strong className="font-extrabold text-ink">{children}</strong>
   ),
   em: ({ children }) => (
-    <em className="italic font-semibold text-slate-700 dark:text-slate-300">{children}</em>
+    <em className="italic font-semibold text-ink-soft">{children}</em>
   ),
   code: ({ inline, children }) =>
     inline ? (
@@ -104,29 +105,29 @@ const markdownComponents = {
       </pre>
     ),
   blockquote: ({ children }) => (
-    <blockquote className="border-l-4 border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 pl-4 py-2 my-3 text-sm text-slate-700 dark:text-slate-300 italic rounded-r-lg">
+    <blockquote className="border-l-4 border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/30 pl-4 py-2 my-3 text-sm text-ink-soft italic rounded-r-lg">
       {children}
     </blockquote>
   ),
   table: ({ children }) => (
     <div className="overflow-x-auto mb-3">
-      <table className="min-w-full text-sm border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+      <table className="min-w-full text-sm border border-line rounded-lg overflow-hidden">
         {children}
       </table>
     </div>
   ),
   thead: ({ children }) => (
-    <thead className="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-bold">{children}</thead>
+    <thead className="bg-surface-sunken text-ink font-bold">{children}</thead>
   ),
   th: ({ children }) => (
-    <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100">
+    <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider border-b border-line text-ink">
       {children}
     </th>
   ),
   td: ({ children }) => (
-    <td className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-medium">{children}</td>
+    <td className="px-3 py-2 border-b border-line text-ink-soft font-medium">{children}</td>
   ),
-  hr: () => <hr className="my-4 border-slate-200 dark:border-slate-800" />,
+  hr: () => <hr className="my-4 border-line" />,
 };
 
 /* ─── Interactive Mind Map Node Renderer ──────────────────────────────── */
@@ -134,9 +135,9 @@ function RenderMindMapNode({ node, onAction }) {
   if (!node) return null;
   return (
     <div className="ml-3 my-2 border-l-2 border-indigo-200 pl-3 space-y-2">
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs hover:shadow-md transition">
+      <div className="bg-surface p-3.5 rounded-xl border border-line shadow-2xs hover:shadow-md transition">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+          <span className="font-bold text-ink text-sm flex items-center gap-1.5">
             <Sparkles className="h-4 w-4 text-indigo-500" /> {node.label}
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -167,7 +168,7 @@ function RenderMindMapNode({ node, onAction }) {
           </div>
         </div>
         {node.description && (
-          <p className="text-xs text-slate-500 mt-1">{node.description}</p>
+          <p className="text-xs text-ink-subtle mt-1">{node.description}</p>
         )}
       </div>
 
@@ -186,6 +187,8 @@ export default function StudentPortal({ user, onLogout }) {
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("vce_theme") === "dark";
   });
+
+  useThemeAttribute(isDark);
 
   const toggleTheme = () => {
     setIsDark((prev) => {
@@ -891,38 +894,26 @@ export default function StudentPortal({ user, onLogout }) {
 
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
-      isDark ? "bg-[#0B1020] text-slate-100" : "bg-[#F8FAFC] text-slate-800"
-    }`}>
+    <div className="ds-page flex flex-col relative overflow-hidden">
       {/* 60 FPS HTML5 Canvas Background Particle Network */}
       <NetworkCanvas isDark={isDark} />
 
       {/* Header */}
-      <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ${
-        isDark ? "bg-slate-900/80 border-slate-800/80 backdrop-blur-md" : "bg-white/90 border-slate-200 backdrop-blur-md"
-      }`}>
+      <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ds-topbar`}>
         <div className="flex items-center space-x-3">
           {/* History Back & Forward Navigation Controls */}
           <div className="flex items-center gap-1 mr-1">
             <button
               onClick={() => window.history.back()}
               title="Go Back (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
-                isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-              }`}
+              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center bg-surface-sunken border-line text-ink-soft hover:bg-line/60 hover:text-ink`}
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
             <button
               onClick={() => window.history.forward()}
               title="Go Forward (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
-                isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-              }`}
+              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center bg-surface-sunken border-line text-ink-soft hover:bg-line/60 hover:text-ink`}
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -946,11 +937,7 @@ export default function StudentPortal({ user, onLogout }) {
         </div>
 
         {/* Course / Subject Selector */}
-        <div className={`flex items-center gap-2.5 px-4 py-2 rounded-2xl text-xs font-bold border transition ${
-          isDark
-            ? "bg-slate-950/80 border-indigo-500/30 text-indigo-300 shadow-sm"
-            : "bg-indigo-50 border-indigo-200 text-indigo-900 shadow-xs"
-        }`}>
+        <div className={`flex items-center gap-2.5 px-4 py-2 rounded-2xl text-xs font-bold border transition bg-primary-soft border-primary/30 text-primary-ink shadow-sm`}>
           <BookOpen className="h-4 w-4 text-indigo-500 flex-shrink-0" />
           <span className="opacity-80">Course:</span>
           {facultyList.length === 0 ? (
@@ -959,9 +946,7 @@ export default function StudentPortal({ user, onLogout }) {
             <select
               value={selectedFacultyId || ""}
               onChange={(e) => setSelectedFacultyId(Number(e.target.value))}
-              className={`font-extrabold rounded-xl px-3 py-1 text-xs focus:outline-none transition cursor-pointer ${
-                isDark ? "bg-slate-900 text-indigo-200 border border-indigo-500/40" : "bg-white text-indigo-950 border border-slate-300"
-              }`}
+              className={`font-extrabold rounded-xl px-3 py-1 text-xs focus:outline-none transition cursor-pointer bg-field text-primary-ink border border-line-strong`}
             >
               {facultyList.map((f) => (
                 <option key={f.id} value={f.id}>
@@ -978,9 +963,7 @@ export default function StudentPortal({ user, onLogout }) {
             className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-2xl border transition cursor-pointer ${
               showHero
                 ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
-                : isDark
-                ? "bg-slate-800/80 text-indigo-300 border-indigo-500/30 hover:bg-slate-800"
-                : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                : "bg-primary-soft text-primary-ink border-primary/30 hover:border-primary/60"
             }`}
           >
             <Sparkles className="h-3.5 w-3.5" /> ✦ Entrance Hero
@@ -993,11 +976,7 @@ export default function StudentPortal({ user, onLogout }) {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onLogout}
-            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-2xl border transition cursor-pointer ${
-              isDark
-                ? "bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800"
-                : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-            }`}
+            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-2xl border transition cursor-pointer bg-surface-sunken border-line text-ink-soft hover:bg-line/60`}
           >
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </motion.button>
@@ -1015,9 +994,7 @@ export default function StudentPortal({ user, onLogout }) {
 
       <div className={`flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col md:flex-row gap-6 z-10 ${showHero ? "hidden" : ""}`}>
         {/* ─── Left Sidebar Navigation ─── */}
-        <aside className={`w-full md:w-72 flex-shrink-0 p-5 rounded-3xl border shadow-md space-y-6 h-fit transition ${
-          isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-        }`}>
+        <aside className={`w-full md:w-72 flex-shrink-0 p-5 rounded-3xl border shadow-md space-y-6 h-fit transition ds-card`}>
           {/* Section 1: Syllabus Units */}
           <div>
             <h2 className="text-xs font-black uppercase tracking-wider mb-3 flex items-center gap-2 opacity-80">
@@ -1033,9 +1010,7 @@ export default function StudentPortal({ user, onLogout }) {
                     onClick={() => u.indexed && handleToggleUnit(u.unit_number)}
                     className={`w-full text-left p-3 rounded-2xl border transition ${
                       u.indexed
-                        ? isDark
-                          ? "bg-slate-950/60 border-slate-800 hover:border-indigo-500/50 cursor-pointer"
-                          : "bg-slate-50 border-slate-100 hover:border-blue-300 cursor-pointer"
+                        ? "ds-inset hover:border-primary/50 cursor-pointer"
                         : "opacity-40 cursor-default"
                     }`}
                   >
@@ -1044,7 +1019,7 @@ export default function StudentPortal({ user, onLogout }) {
                         {u.indexed && (
                           expandedUnit === u.unit_number
                             ? <ChevronDown className="h-3.5 w-3.5 text-indigo-400 flex-shrink-0" />
-                            : <ChevronRight className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-ink-subtle flex-shrink-0" />
                         )}
                         <span className="text-xs font-bold truncate">
                           Unit {u.unit_number}
@@ -1060,7 +1035,7 @@ export default function StudentPortal({ user, onLogout }) {
 
                     {u.indexed && (
                       <div className="mt-2 ml-5">
-                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-line rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               u.mastery_percent >= 80
@@ -1090,11 +1065,7 @@ export default function StudentPortal({ user, onLogout }) {
                         (subtopicsCache[u.unit_number] || []).map((st, sIdx) => (
                           <div
                             key={sIdx}
-                            className={`p-2 rounded-xl text-xs flex items-center justify-between transition ${
-                              isDark
-                                ? "bg-slate-950/80 border border-slate-800 hover:border-indigo-500/50"
-                                : "bg-slate-50 border border-slate-200 hover:border-indigo-300"
-                            }`}
+                            className={`p-2 rounded-xl text-xs flex items-center justify-between transition ds-inset border hover:border-primary/50`}
                           >
                             <span className="font-semibold text-[11px] truncate max-w-[120px]" title={st}>
                               {st}
@@ -1152,20 +1123,14 @@ export default function StudentPortal({ user, onLogout }) {
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition relative cursor-pointer ${
                       isActive
-                        ? isDark
-                          ? "text-white font-extrabold"
-                          : "text-indigo-950 font-extrabold"
-                        : isDark
-                        ? "text-slate-400 hover:text-slate-200"
-                        : "text-slate-600 hover:text-slate-900"
+                        ? "text-ink font-extrabold"
+                        : "text-ink-muted hover:text-ink"
                     }`}
                   >
                     {isActive && (
                       <motion.div
                         layoutId="activeSidebarTabPill"
-                        className={`absolute inset-0 rounded-2xl ${
-                          isDark ? "bg-indigo-600/30 border border-indigo-500/40 shadow-sm" : "bg-blue-50 border border-blue-200 shadow-xs"
-                        }`}
+                        className={`absolute inset-0 rounded-2xl ds-nav-active`}
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                       />
                     )}
@@ -1178,9 +1143,7 @@ export default function StudentPortal({ user, onLogout }) {
           </div>
 
           {/* Section 3: Compact Progress Pill */}
-          <div className={`p-4 rounded-2xl border space-y-2 transition ${
-            isDark ? "bg-slate-950/80 border-slate-800" : "bg-slate-50 border-slate-200"
-          }`}>
+          <div className={`p-4 rounded-2xl border space-y-2 transition ds-inset`}>
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-amber-400 flex items-center gap-1">
                 <Flame className="w-4 h-4 animate-bounce" /> {gamification?.streak_days || 0} Days Streak
@@ -1189,7 +1152,7 @@ export default function StudentPortal({ user, onLogout }) {
                 Level {gamification?.level || 1} ({gamification?.xp || 0} XP)
               </span>
             </div>
-            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-line rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-500 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(((gamification?.xp || 0) / (gamification?.next_level_xp || 100)) * 100, 100)}%` }}
@@ -1204,12 +1167,12 @@ export default function StudentPortal({ user, onLogout }) {
           {/* ═══════════════ STUDY TAB ═══════════════ */}
           {activeTab === "study" && (
             <>
-              <div className={`p-6 rounded-2xl border transition-all ${isDark ? "bg-slate-900/90 border-slate-800/80 shadow-2xl text-slate-100" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+              <div className={`p-6 rounded-2xl border transition-all ds-card text-ink`}>
                 <form onSubmit={handleAsk} className="space-y-4">
                   {/* Topic Filter Selector */}
-                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border ds-inset`}>
                     <div>
-                      <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                      <label className={`block text-xs font-bold mb-1 text-ink-muted`}>
                         🎯 Target Unit (Optional):
                       </label>
                       <select
@@ -1218,7 +1181,7 @@ export default function StudentPortal({ user, onLogout }) {
                           setQaUnitSelect(e.target.value);
                           setQaSubtopicSelect("");
                         }}
-                        className={`w-full border rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                        className={`w-full border rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 ds-field`}
                       >
                         <option value="">All Syllabus Units</option>
                         {units.map((u) => (
@@ -1230,7 +1193,7 @@ export default function StudentPortal({ user, onLogout }) {
                     </div>
 
                     <div>
-                      <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-600"}`}>
+                      <label className={`block text-xs font-bold mb-1 text-ink-muted`}>
                         🔍 Specific Subtopic (Optional):
                       </label>
                       <input
@@ -1238,13 +1201,13 @@ export default function StudentPortal({ user, onLogout }) {
                         value={qaSubtopicSelect}
                         onChange={(e) => setQaSubtopicSelect(e.target.value)}
                         placeholder="e.g. Stemming, CPU Scheduling..."
-                        className={`w-full border rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? "bg-slate-900 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"}`}
+                        className={`w-full border rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 ds-field`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className={`block text-sm font-bold mb-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                    <label className={`block text-sm font-bold mb-2 text-ink-soft`}>
                       Ask Question from Prescribed Syllabus
                     </label>
                     <input
@@ -1252,23 +1215,19 @@ export default function StudentPortal({ user, onLogout }) {
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="e.g., Define Round Robin CPU Scheduling and its time quantum..."
-                      className={`w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium ${isDark ? "bg-slate-950 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"}`}
+                      className={`w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium ds-field`}
                     />
                   </div>
 
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className={`flex items-center space-x-2 p-1 rounded-lg border text-xs font-semibold ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+                    <div className={`flex items-center space-x-2 p-1 rounded-lg border text-xs font-semibold ds-inset`}>
                       <button
                         type="button"
                         onClick={() => setMode("exam")}
                         className={`px-3 py-1.5 rounded-md transition ${
                           mode === "exam"
-                            ? isDark
-                              ? "bg-indigo-600 text-white shadow-sm"
-                              : "bg-white text-blue-700 shadow-sm"
-                            : isDark
-                            ? "text-slate-400 hover:text-white"
-                            : "text-slate-600 hover:text-slate-900"
+                            ? "bg-surface text-primary-ink shadow-sm"
+                            : "text-ink-muted hover:text-ink"
                         }`}
                       >
                         📝 Exam Mode
@@ -1278,12 +1237,8 @@ export default function StudentPortal({ user, onLogout }) {
                         onClick={() => setMode("analogy")}
                         className={`px-3 py-1.5 rounded-md transition ${
                           mode === "analogy"
-                            ? isDark
-                              ? "bg-amber-600 text-white shadow-sm"
-                              : "bg-white text-amber-600 shadow-sm"
-                            : isDark
-                            ? "text-slate-400 hover:text-white"
-                            : "text-slate-600 hover:text-slate-900"
+                            ? "bg-surface text-warning shadow-sm"
+                            : "text-ink-muted hover:text-ink"
                         }`}
                       >
                         💡 Analogy Mode
@@ -1303,7 +1258,7 @@ export default function StudentPortal({ user, onLogout }) {
 
               {/* Beautiful Answer Card */}
               {result && (
-                <div className={`rounded-2xl border overflow-hidden transition-all ${isDark ? "bg-slate-900/90 border-slate-800 shadow-2xl text-slate-100" : "bg-white border-slate-200 shadow-sm text-slate-900"}`}>
+                <div className={`rounded-2xl border overflow-hidden transition-all ds-card text-ink`}>
                   {/* Gradient accent bar */}
                   <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500" />
 
@@ -1312,7 +1267,7 @@ export default function StudentPortal({ user, onLogout }) {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-blue-600" />
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <span className="text-xs font-bold uppercase tracking-wider text-ink-subtle">
                           {mode === "analogy" ? "Analogy Explanation" : "Verified Answer"}
                         </span>
                       </div>
@@ -1341,8 +1296,8 @@ export default function StudentPortal({ user, onLogout }) {
 
                     {/* Feature 7: Explain-Again Buttons */}
                     {lastQuery && (
-                      <div className="pt-3 border-t border-slate-100 flex items-center gap-3 flex-wrap">
-                        <span className="text-[11px] text-slate-400 font-medium">Re-explain:</span>
+                      <div className="pt-3 border-t border-line flex items-center gap-3 flex-wrap">
+                        <span className="text-[11px] text-ink-subtle font-medium">Re-explain:</span>
                         <button
                           onClick={() => handleExplainAgain("simpler")}
                           disabled={explainLoading}
@@ -1364,8 +1319,8 @@ export default function StudentPortal({ user, onLogout }) {
 
                     {/* Source info footer */}
                     {result.unit_number && (
-                      <div className="pt-3 border-t border-slate-100">
-                        <p className="text-[11px] text-slate-400">
+                      <div className="pt-3 border-t border-line">
+                        <p className="text-[11px] text-ink-subtle">
                           Sourced from Unit {result.unit_number} · Syllabus-verified response
                         </p>
                       </div>
@@ -1384,12 +1339,12 @@ export default function StudentPortal({ user, onLogout }) {
           {/* ═══════════════ MIND MAPS TAB ═══════════════ */}
           {activeTab === "mindmap" && (
             <div className="space-y-6">
-              <div className={`p-6 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+              <div className={`p-6 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all ds-card text-ink`}>
                 <div>
-                  <h3 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  <h3 className={`text-lg font-extrabold flex items-center gap-2 text-ink`}>
                     <Network className="h-5 w-5 text-indigo-400" /> Interactive AI Mind Map
                   </h3>
-                  <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>Visual PDF syllabus hierarchy. Click concept nodes to Explain, see Examples, or Quiz yourself.</p>
+                  <p className={`text-xs text-ink-subtle`}>Visual PDF syllabus hierarchy. Click concept nodes to Explain, see Examples, or Quiz yourself.</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <select
@@ -1398,7 +1353,7 @@ export default function StudentPortal({ user, onLogout }) {
                       setMindMapUnit(e.target.value);
                       handleLoadMindMap(e.target.value);
                     }}
-                    className={`px-3 py-2 rounded-xl border text-xs font-semibold outline-none ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                    className={`px-3 py-2 rounded-xl border text-xs font-semibold outline-none ds-field`}
                   >
                     {units.map((u) => (
                       <option key={u.unit_number} value={u.unit_number}>
@@ -1418,9 +1373,9 @@ export default function StudentPortal({ user, onLogout }) {
               </div>
 
               {mindMapLoading ? (
-                <div className="bg-white p-12 rounded-xl border border-slate-200 text-center space-y-3">
+                <div className="bg-surface p-12 rounded-xl border border-line text-center space-y-3">
                   <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700">Structuring syllabus topics into interactive tree...</p>
+                  <p className="text-sm font-semibold text-ink-soft">Structuring syllabus topics into interactive tree...</p>
                 </div>
               ) : mindMapData ? (
                 <MindMapVisualizer
@@ -1432,7 +1387,7 @@ export default function StudentPortal({ user, onLogout }) {
                   isCached={mindMapData.cached}
                 />
               ) : (
-                <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500 text-sm">
+                <div className="bg-surface p-8 rounded-xl border border-line text-center text-ink-subtle text-sm">
                   Select a unit above to view its interactive AI Mind Map.
                 </div>
               )}
@@ -1442,12 +1397,12 @@ export default function StudentPortal({ user, onLogout }) {
           {/* ═══════════════ REVISION NOTES TAB ═══════════════ */}
           {activeTab === "notes" && (
             <div className="space-y-6">
-              <div className={`p-6 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+              <div className={`p-6 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all ds-card text-ink`}>
                 <div>
-                  <h3 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}>
+                  <h3 className={`text-lg font-extrabold flex items-center gap-2 text-ink`}>
                     <BookMarked className="h-5 w-5 text-blue-400" /> AI Syllabus Revision Notes
                   </h3>
-                  <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>High-yield exam points, key definitions, formulas, and expected questions generated from PDF context.</p>
+                  <p className={`text-xs text-ink-subtle`}>High-yield exam points, key definitions, formulas, and expected questions generated from PDF context.</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <select
@@ -1456,7 +1411,7 @@ export default function StudentPortal({ user, onLogout }) {
                       setNotesUnit(e.target.value);
                       handleLoadNotes(e.target.value);
                     }}
-                    className={`px-3 py-2 rounded-xl border text-xs font-semibold outline-none ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                    className={`px-3 py-2 rounded-xl border text-xs font-semibold outline-none ds-field`}
                   >
                     {units.map((u) => (
                       <option key={u.unit_number} value={u.unit_number}>
@@ -1476,14 +1431,14 @@ export default function StudentPortal({ user, onLogout }) {
               </div>
 
               {notesLoading ? (
-                <div className="bg-white p-12 rounded-xl border border-slate-200 text-center space-y-3">
+                <div className="bg-surface p-12 rounded-xl border border-line text-center space-y-3">
                   <Loader2 className="h-8 w-8 text-blue-600 animate-spin mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700">Synthesizing high-yield exam revision notes...</p>
+                  <p className="text-sm font-semibold text-ink-soft">Synthesizing high-yield exam revision notes...</p>
                 </div>
               ) : revisionNotesData ? (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <div className="bg-surface p-6 rounded-xl border border-line shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-line">
+                    <span className="text-xs font-bold text-ink-soft uppercase tracking-wider">
                       Unit {revisionNotesData.unit_number}: {revisionNotesData.unit_name} Revision Sheet
                     </span>
                     <div className="flex items-center gap-2">
@@ -1498,7 +1453,7 @@ export default function StudentPortal({ user, onLogout }) {
                           setCopiedNotes(true);
                           setTimeout(() => setCopiedNotes(false), 2000);
                         }}
-                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition"
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-surface-sunken text-ink-soft hover:bg-slate-200 rounded-lg transition"
                       >
                         {copiedNotes ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
                         {copiedNotes ? "Copied!" : "Copy Notes"}
@@ -1517,7 +1472,7 @@ export default function StudentPortal({ user, onLogout }) {
                   </div>
                 </div>
               ) : (
-                <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500 text-sm">
+                <div className="bg-surface p-8 rounded-xl border border-line text-center text-ink-subtle text-sm">
                   Select a unit to view syllabus-bound revision notes.
                 </div>
               )}
@@ -1528,21 +1483,21 @@ export default function StudentPortal({ user, onLogout }) {
           {activeTab === "mock_exam" && (
             <div className="space-y-6">
               {!mockExamActive && !mockExamReport && (
-                <div className={`p-6 rounded-2xl border space-y-5 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+                <div className={`p-6 rounded-2xl border space-y-5 transition-all ds-card text-ink`}>
                   <div className="text-center space-y-2">
                     <Clock className="h-10 w-10 text-amber-500 mx-auto animate-pulse" />
-                    <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Timed AI Mock Exam Simulator</h3>
-                    <p className={`text-sm max-w-md mx-auto ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <h3 className={`text-lg font-bold text-ink`}>Timed AI Mock Exam Simulator</h3>
+                    <p className={`text-sm max-w-md mx-auto text-ink-subtle`}>
                       Simulate actual examination conditions across multiple units with live timer and per-unit score analysis.
                     </p>
                   </div>
 
-                  <div className={`max-w-xl mx-auto space-y-4 p-5 rounded-xl border ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
+                  <div className={`max-w-xl mx-auto space-y-4 p-5 rounded-xl border ds-inset`}>
                     <div>
-                      <label className={`block text-xs font-bold mb-2 ${isDark ? "text-slate-300" : "text-slate-700"}`}>Select Examination Units:</label>
+                      <label className={`block text-xs font-bold mb-2 text-ink-soft`}>Select Examination Units:</label>
                       <div className="grid grid-cols-2 gap-2">
                         {units.map((u) => (
-                          <label key={u.unit_number} className={`flex items-center gap-2 text-xs p-2 rounded-lg border cursor-pointer ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800"}`}>
+                          <label key={u.unit_number} className={`flex items-center gap-2 text-xs p-2 rounded-lg border cursor-pointer ds-field`}>
                             <input
                               type="checkbox"
                               checked={mockExamSelectedUnits.includes(u.unit_number)}
@@ -1563,11 +1518,11 @@ export default function StudentPortal({ user, onLogout }) {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-700"}`}>Duration (Minutes):</label>
+                        <label className={`block text-xs font-bold mb-1 text-ink-soft`}>Duration (Minutes):</label>
                         <select
                           value={mockExamDuration}
                           onChange={(e) => setMockExamDuration(Number(e.target.value))}
-                          className={`w-full border rounded-lg p-2 text-xs font-semibold outline-none ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                          className={`w-full border rounded-lg p-2 text-xs font-semibold outline-none ds-field`}
                         >
                           <option value={10}>10 Minutes</option>
                           <option value={20}>20 Minutes</option>
@@ -1576,11 +1531,11 @@ export default function StudentPortal({ user, onLogout }) {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">Total Questions:</label>
+                        <label className="block text-xs font-bold text-ink-soft mb-1">Total Questions:</label>
                         <select
                           value={mockExamNumQuestions}
                           onChange={(e) => setMockExamNumQuestions(Number(e.target.value))}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-semibold"
+                          className="w-full bg-surface border border-line-strong rounded-lg p-2 text-xs font-semibold"
                         >
                           <option value={10}>10 Questions</option>
                           <option value={15}>15 Questions</option>
@@ -1603,11 +1558,11 @@ export default function StudentPortal({ user, onLogout }) {
 
               {/* Active Exam Interface */}
               {mockExamActive && mockExamData && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-md p-6 space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200">
+                <div className="bg-surface rounded-xl border border-line shadow-md p-6 space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-line">
                     <div>
-                      <h3 className="font-bold text-slate-900 text-base">Timed Mock Examination</h3>
-                      <p className="text-xs text-slate-500">Question {mockExamCurrentIndex + 1} of {mockExamData.questions.length}</p>
+                      <h3 className="font-bold text-ink text-base">Timed Mock Examination</h3>
+                      <p className="text-xs text-ink-subtle">Question {mockExamCurrentIndex + 1} of {mockExamData.questions.length}</p>
                     </div>
 
                     <div className="flex items-center gap-3 bg-amber-50 border border-amber-300 px-4 py-2 rounded-xl text-amber-900 font-mono font-bold text-sm">
@@ -1619,11 +1574,11 @@ export default function StudentPortal({ user, onLogout }) {
                   {/* Question Cards */}
                   {mockExamData.questions[mockExamCurrentIndex] && (
                     <div className="space-y-4">
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                      <div className="bg-surface-sunken p-4 rounded-xl border border-line">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
                           Unit {mockExamData.questions[mockExamCurrentIndex].unit_number}
                         </span>
-                        <h4 className="font-bold text-slate-900 text-sm mt-2">
+                        <h4 className="font-bold text-ink text-sm mt-2">
                           Q{mockExamCurrentIndex + 1}. {mockExamData.questions[mockExamCurrentIndex].question}
                         </h4>
                       </div>
@@ -1641,7 +1596,7 @@ export default function StudentPortal({ user, onLogout }) {
                             className={`w-full text-left p-3.5 rounded-xl border text-xs font-semibold transition flex items-center justify-between cursor-pointer ${
                               mockExamAnswers[mockExamData.questions[mockExamCurrentIndex].id] === opt
                                 ? "bg-amber-50 border-amber-400 text-amber-900 shadow-xs"
-                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                : "bg-surface border-line text-ink-soft hover:bg-surface-sunken"
                             }`}
                           >
                             <span>{opt}</span>
@@ -1655,11 +1610,11 @@ export default function StudentPortal({ user, onLogout }) {
                   )}
 
                   {/* Navigator Footer */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-line">
                     <button
                       onClick={() => setMockExamCurrentIndex((prev) => Math.max(0, prev - 1))}
                       disabled={mockExamCurrentIndex === 0}
-                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold disabled:opacity-40 cursor-pointer"
+                      className="px-4 py-2 bg-surface-sunken text-ink-soft rounded-lg text-xs font-semibold disabled:opacity-40 cursor-pointer"
                     >
                       Previous
                     </button>
@@ -1674,7 +1629,7 @@ export default function StudentPortal({ user, onLogout }) {
                               ? "bg-amber-600 text-white"
                               : mockExamAnswers[q.id]
                               ? "bg-emerald-100 text-emerald-800"
-                              : "bg-slate-100 text-slate-600"
+                              : "bg-surface-sunken text-ink-muted"
                           }`}
                         >
                           {idx + 1}
@@ -1703,11 +1658,11 @@ export default function StudentPortal({ user, onLogout }) {
 
               {/* End of Exam Report */}
               {mockExamReport && (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-md space-y-6">
-                  <div className="text-center space-y-2 pb-4 border-b border-slate-200">
-                    <Trophy className={`h-12 w-12 mx-auto ${mockExamReport.passed ? "text-amber-500" : "text-slate-400"}`} />
-                    <h3 className="text-xl font-bold text-slate-900">Mock Exam Results Report</h3>
-                    <p className="text-sm font-semibold text-slate-600">
+                <div className="bg-surface p-6 rounded-xl border border-line shadow-md space-y-6">
+                  <div className="text-center space-y-2 pb-4 border-b border-line">
+                    <Trophy className={`h-12 w-12 mx-auto ${mockExamReport.passed ? "text-amber-500" : "text-ink-subtle"}`} />
+                    <h3 className="text-xl font-bold text-ink">Mock Exam Results Report</h3>
+                    <p className="text-sm font-semibold text-ink-muted">
                       Overall Score: <span className={mockExamReport.passed ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>{mockExamReport.score_percent}%</span> ({mockExamReport.correct_count} / {mockExamReport.total_questions})
                     </p>
                   </div>
@@ -1717,13 +1672,13 @@ export default function StudentPortal({ user, onLogout }) {
                   </div>
 
                   <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">Per-Unit Performance Breakdown</h4>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-ink-muted">Per-Unit Performance Breakdown</h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {mockExamReport.unit_breakdown.map((ub) => (
-                        <div key={ub.unit_number} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                        <div key={ub.unit_number} className="p-3 bg-surface-sunken rounded-xl border border-line flex items-center justify-between">
                           <div>
-                            <span className="font-bold text-xs text-slate-800">Unit {ub.unit_number}</span>
-                            <p className="text-[10px] text-slate-500">{ub.correct} of {ub.total} correct</p>
+                            <span className="font-bold text-xs text-ink">Unit {ub.unit_number}</span>
+                            <p className="text-[10px] text-ink-subtle">{ub.correct} of {ub.total} correct</p>
                           </div>
                           <span className={`text-xs font-bold px-2 py-1 rounded-md ${ub.score_percent >= 60 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
                             {ub.score_percent}%
@@ -1753,11 +1708,11 @@ export default function StudentPortal({ user, onLogout }) {
             <>
               {/* Quiz Configuration */}
               {quizzes.length === 0 && (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+                <div className="bg-surface p-6 rounded-xl border border-line shadow-sm space-y-5">
                   <div className="text-center space-y-2">
                     <HelpCircle className="h-10 w-10 text-blue-500 mx-auto" />
-                    <h3 className="text-lg font-bold text-slate-900">Take a Quiz</h3>
-                    <p className="text-sm text-slate-500 max-w-md mx-auto">
+                    <h3 className="text-lg font-bold text-ink">Take a Quiz</h3>
+                    <p className="text-sm text-ink-subtle max-w-md mx-auto">
                       Test your knowledge on any unit. Select a unit, choose how many questions,
                       and challenge yourself!
                     </p>
@@ -1765,13 +1720,13 @@ export default function StudentPortal({ user, onLogout }) {
 
                   <div className="flex flex-wrap items-end justify-center gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                      <label className="block text-xs font-medium text-ink-muted mb-1">
                         Unit
                       </label>
                       <select
                         value={quizUnitSelect}
                         onChange={(e) => setQuizUnitSelect(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-slate-300 text-sm min-w-[200px]"
+                        className="px-3 py-2 rounded-lg border border-line-strong text-sm min-w-[200px]"
                       >
                         {indexedUnits.map((u) => (
                           <option key={u.unit_number} value={u.unit_number}>
@@ -1781,13 +1736,13 @@ export default function StudentPortal({ user, onLogout }) {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                      <label className="block text-xs font-medium text-ink-muted mb-1">
                         Questions
                       </label>
                       <select
                         value={quizNumQuestions}
                         onChange={(e) => setQuizNumQuestions(Number(e.target.value))}
-                        className="px-3 py-2 rounded-lg border border-slate-300 text-sm"
+                        className="px-3 py-2 rounded-lg border border-line-strong text-sm"
                       >
                         <option value={2}>2 questions</option>
                         <option value={5}>5 questions</option>
@@ -1836,13 +1791,13 @@ export default function StudentPortal({ user, onLogout }) {
 
               {/* Quiz Loading Animation */}
               {quizLoading && quizzes.length === 0 && (
-                <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center space-y-4">
+                <div className="bg-surface p-8 rounded-xl border border-line shadow-sm text-center space-y-4">
                   <div className="flex justify-center">
                     <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">Generating your quiz...</p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-sm font-bold text-ink">Generating your quiz...</p>
+                    <p className="text-xs text-ink-subtle mt-1">
                       The AI is crafting {quizNumQuestions} questions from your syllabus. This may take 15-60 seconds.
                     </p>
                   </div>
@@ -1861,14 +1816,14 @@ export default function StudentPortal({ user, onLogout }) {
               {quizzes.length > 0 && (
                 <div className="space-y-4">
                   {/* Quiz header */}
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                  <div className="bg-surface p-4 rounded-xl border border-line shadow-sm flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <ClipboardList className="h-5 w-5 text-blue-600" />
                       <div>
-                        <p className="text-sm font-bold text-slate-900">
+                        <p className="text-sm font-bold text-ink">
                           {quizzes.length} Question Quiz
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-ink-subtle">
                           Unit {quizUnit} · Answer all questions then submit
                         </p>
                       </div>
@@ -1878,7 +1833,7 @@ export default function StudentPortal({ user, onLogout }) {
                         <p className={`text-lg font-bold ${quizScore.correct / quizScore.total >= 0.7 ? "text-emerald-600" : quizScore.correct / quizScore.total >= 0.4 ? "text-amber-600" : "text-red-500"}`}>
                           {quizScore.correct}/{quizScore.total}
                         </p>
-                        <p className="text-[10px] text-slate-400">
+                        <p className="text-[10px] text-ink-subtle">
                           {Math.round((quizScore.correct / quizScore.total) * 100)}% score
                         </p>
                       </div>
@@ -1889,9 +1844,9 @@ export default function StudentPortal({ user, onLogout }) {
                   {quizzes.map((q, qIndex) => (
                     <div
                       key={qIndex}
-                      className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm"
+                      className="bg-surface p-5 rounded-xl border border-line shadow-sm"
                     >
-                      <p className="text-sm font-semibold text-slate-800 mb-3">
+                      <p className="text-sm font-semibold text-ink mb-3">
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold mr-2">
                           {qIndex + 1}
                         </span>
@@ -1924,7 +1879,7 @@ export default function StudentPortal({ user, onLogout }) {
                                   ? "bg-red-50 border-red-400 text-red-800 font-medium"
                                   : isSelected
                                   ? "bg-blue-50 border-blue-400 text-blue-800"
-                                  : "bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700"
+                                  : "bg-surface-sunken border-line hover:bg-slate-100 hover:border-slate-300 text-ink-soft"
                               }`}
                             >
                               <span className="font-semibold text-xs mr-2 opacity-60">
@@ -1979,21 +1934,21 @@ export default function StudentPortal({ user, onLogout }) {
           {activeTab === "insights" && (
             <div className="space-y-8">
               {/* 1. LEARNER OVERVIEW CARD */}
-              <div className={`p-6 rounded-2xl border transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+              <div className={`p-6 rounded-2xl border transition-all ds-card text-ink`}>
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
                     <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-indigo-400 animate-pulse" />
                       AI Learner Intelligence Dashboard
                     </h2>
-                    <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <p className={`text-xs mt-1 text-ink-subtle`}>
                       Real-time topic mastery, weak-topic detection, and evidence-grounded study planner
                     </p>
                   </div>
                   <button
                     onClick={loadInsightsData}
                     disabled={insightsLoading}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/80 px-3.5 py-2 rounded-xl border border-indigo-800 transition disabled:opacity-50"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-primary-ink bg-primary-soft hover:bg-primary/15 px-3.5 py-2 rounded-xl border border-primary/30 transition disabled:opacity-50"
                   >
                     {insightsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                     {insightsLoading ? "Analyzing..." : "Refresh Intelligence"}
@@ -2003,16 +1958,16 @@ export default function StudentPortal({ user, onLogout }) {
                 {insightsLoading && !insightsData ? (
                   <div className="text-center py-10">
                     <Loader2 className="h-8 w-8 text-indigo-500 animate-spin mx-auto" />
-                    <p className={`text-sm mt-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>Extracting syllabus subtopics & computing student performance...</p>
+                    <p className={`text-sm mt-3 text-ink-subtle`}>Extracting syllabus subtopics & computing student performance...</p>
                   </div>
                 ) : !insightsData?.overview?.has_sufficient_data || insightsData?.is_new_learner ? (
                   /* Insufficient Data / New Learner State */
-                  <div className={`p-6 rounded-xl border text-center space-y-3 ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
+                  <div className={`p-6 rounded-xl border text-center space-y-3 ds-inset`}>
                     <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto">
                       <Award className="h-6 w-6" />
                     </div>
-                    <h3 className="text-base font-bold text-slate-200">No Sufficient Learning Data Yet</h3>
-                    <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    <h3 className="text-base font-bold text-ink-soft">No Sufficient Learning Data Yet</h3>
+                    <p className="text-xs text-ink-subtle max-w-md mx-auto">
                       {insightsData?.new_learner_message || "You have not completed enough assessments for topic-level mastery estimation. Start with a short diagnostic quiz to personalize your study plan."}
                     </p>
                     <button
@@ -2026,10 +1981,10 @@ export default function StudentPortal({ user, onLogout }) {
                   /* Overview Metrics Grid */
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
                     {/* Overall Mastery Ring */}
-                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center text-center ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-100"}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center text-center ds-inset`}>
                       <div className="relative w-14 h-14 mb-2">
                         <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 36 36">
-                          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={isDark ? "#334155" : "#e2e8f0"} strokeWidth="3.5" />
+                          <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgb(var(--color-line))" strokeWidth="3.5" />
                           <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none"
                             stroke={insightsData.overview.overall_mastery >= 70 ? "#10b981" : insightsData.overview.overall_mastery >= 40 ? "#f59e0b" : "#ef4444"}
                             strokeWidth="3.5" strokeDasharray={`${insightsData.overview.overall_mastery}, 100`} />
@@ -2038,35 +1993,35 @@ export default function StudentPortal({ user, onLogout }) {
                           <span className="text-xs font-bold">{insightsData.overview.overall_mastery}%</span>
                         </div>
                       </div>
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Overall Mastery</span>
+                      <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider">Overall Mastery</span>
                     </div>
 
-                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-100"}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center ds-inset`}>
                       <span className="text-2xl font-extrabold text-blue-400">{insightsData.overview.total_attempts}</span>
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Quiz Sessions</span>
+                      <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider mt-1">Quiz Sessions</span>
                     </div>
 
-                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-100"}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center ds-inset`}>
                       <span className="text-2xl font-extrabold text-indigo-400">{insightsData.overview.questions_answered}</span>
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Questions</span>
+                      <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider mt-1">Questions</span>
                     </div>
 
-                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-100"}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center ds-inset`}>
                       <span className="text-2xl font-extrabold text-emerald-400">{insightsData.overview.correct_answers}</span>
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-1">Correct</span>
+                      <span className="text-[11px] font-semibold text-ink-subtle uppercase tracking-wider mt-1">Correct</span>
                     </div>
 
-                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-red-950/30 border-red-900/50" : "bg-red-50 border-red-100"}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center bg-danger-soft border-danger/25`}>
                       <span className="text-2xl font-extrabold text-red-400">{insightsData.overview.weak_count}</span>
                       <span className="text-[11px] font-semibold text-red-400/80 uppercase tracking-wider mt-1">Weak Topics</span>
                     </div>
 
-                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-emerald-950/30 border-emerald-900/50" : "bg-emerald-50 border-emerald-100"}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center bg-success-soft border-success/25`}>
                       <span className="text-2xl font-extrabold text-emerald-400">{insightsData.overview.strong_count}</span>
                       <span className="text-[11px] font-semibold text-emerald-400/80 uppercase tracking-wider mt-1">Strong Topics</span>
                     </div>
 
-                    <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-purple-950/30 border-purple-900/50" : "bg-purple-50 border-purple-100"}`}>
+                    <div className={`p-4 rounded-xl border flex flex-col justify-center bg-insight-soft border-insight/25`}>
                       <span className="text-2xl font-extrabold text-purple-400">{insightsData.overview.xp} <span className="text-xs text-purple-300">XP</span></span>
                       <span className="text-[11px] font-semibold text-purple-400/80 uppercase tracking-wider mt-1">🔥 {insightsData.overview.streak_days} Day Streak</span>
                     </div>
@@ -2077,7 +2032,7 @@ export default function StudentPortal({ user, onLogout }) {
               {/* 2. CONTEXTUAL RECOMMENDATION CARDS (5 CARDS) */}
               {insightsData?.recommendations && insightsData.recommendations.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-ink-muted flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-indigo-400" /> Evidence-Based Recommendations
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -2135,7 +2090,7 @@ export default function StudentPortal({ user, onLogout }) {
 
               {/* 3. WEAK TOPICS DETECTED CARDS */}
               {insightsData?.weak_topics && insightsData.weak_topics.length > 0 && (
-                <div className={`p-6 rounded-2xl border space-y-4 ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200"}`}>
+                <div className={`p-6 rounded-2xl border space-y-4 ds-card text-ink`}>
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-bold uppercase tracking-wider text-red-400 flex items-center gap-2">
                       <TrendingDown className="h-4 w-4 text-red-500" /> Weak Topics Detected ({insightsData.weak_topics.length})
@@ -2144,7 +2099,7 @@ export default function StudentPortal({ user, onLogout }) {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {insightsData.weak_topics.map((wt, idx) => (
-                      <div key={idx} className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-slate-950/80 border-red-900/40" : "bg-red-50/50 border-red-200"}`}>
+                      <div key={idx} className={`p-4 rounded-xl border space-y-3 bg-danger-soft border-danger/25`}>
                         <div className="flex items-start justify-between">
                           <div>
                             <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/30">
@@ -2157,13 +2112,13 @@ export default function StudentPortal({ user, onLogout }) {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2 text-xs text-slate-400 pt-1 border-t border-slate-800">
-                          <div>Attempts: <span className="font-bold text-slate-200">{wt.total_attempts}</span></div>
-                          <div>Correct: <span className="font-bold text-slate-200">{wt.correct_count}</span></div>
+                        <div className="grid grid-cols-3 gap-2 text-xs text-ink-subtle pt-1 border-t border-line">
+                          <div>Attempts: <span className="font-bold text-ink-soft">{wt.total_attempts}</span></div>
+                          <div>Correct: <span className="font-bold text-ink-soft">{wt.correct_count}</span></div>
                           <div>Priority: <span className="font-bold text-red-400">{wt.priority}</span></div>
                         </div>
 
-                        <p className="text-xs text-slate-300 italic bg-slate-900/50 p-2.5 rounded-lg border border-slate-800">
+                        <p className="text-xs text-ink-muted italic bg-surface-sunken p-2.5 rounded-lg border border-line">
                           "{wt.why_evidence}"
                         </p>
 
@@ -2173,7 +2128,7 @@ export default function StudentPortal({ user, onLogout }) {
                               setActiveTab("qa");
                               setQaSubtopicSelect(wt.topic);
                             }}
-                            className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-center transition"
+                            className="flex-1 py-1.5 px-2 text-xs font-semibold rounded-lg bg-surface-sunken hover:bg-line text-ink-soft border border-line-strong text-center transition"
                           >
                             Study Topic
                           </button>
@@ -2198,28 +2153,28 @@ export default function StudentPortal({ user, onLogout }) {
 
               {/* 4. TOPIC-LEVEL MASTERY GRID */}
               {insightsData?.topic_mastery_list && (
-                <div className={`p-6 rounded-2xl border space-y-4 ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200"}`}>
+                <div className={`p-6 rounded-2xl border space-y-4 ds-card text-ink`}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-ink-soft flex items-center gap-2">
                         <Award className="h-4 w-4 text-emerald-400" /> Syllabus Topic Mastery Breakdown
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">Syllabus-extracted topics and deterministic attempt-based accuracy</p>
+                      <p className="text-xs text-ink-subtle mt-0.5">Syllabus-extracted topics and deterministic attempt-based accuracy</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {insightsData.topic_mastery_list.map((tm, idx) => (
-                      <div key={idx} className={`p-3.5 rounded-xl border flex flex-col justify-between ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
+                      <div key={idx} className={`p-3.5 rounded-xl border flex flex-col justify-between ds-inset`}>
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-[10px] font-semibold text-slate-400">Unit {tm.unit_number}</span>
+                            <span className="text-[10px] font-semibold text-ink-subtle">Unit {tm.unit_number}</span>
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               tm.status === "WEAK" ? "bg-red-500/20 text-red-300 border border-red-500/30" :
                               tm.status === "DEVELOPING" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
                               tm.status === "STRONG" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" :
                               tm.status === "MASTERED" ? "bg-purple-500/20 text-purple-300 border border-purple-500/30" :
-                              "bg-slate-800 text-slate-400 border border-slate-700"
+                              "bg-surface-sunken text-ink-subtle border border-line-strong"
                             }`}>
                               {tm.status.replace("_", " ")}
                             </span>
@@ -2229,20 +2184,20 @@ export default function StudentPortal({ user, onLogout }) {
 
                         <div className="mt-3 space-y-1.5">
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-400">Accuracy</span>
-                            <span className="font-bold text-slate-200">{tm.status === "INSUFFICIENT_DATA" ? "N/A" : `${tm.mastery_percent}%`}</span>
+                            <span className="text-ink-subtle">Accuracy</span>
+                            <span className="font-bold text-ink-soft">{tm.status === "INSUFFICIENT_DATA" ? "N/A" : `${tm.mastery_percent}%`}</span>
                           </div>
-                          <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="w-full h-2 bg-line rounded-full overflow-hidden">
                             <div
                               className={`h-full transition-all duration-500 ${
                                 tm.mastery_percent >= 70 ? "bg-emerald-500" :
                                 tm.mastery_percent >= 50 ? "bg-amber-500" :
-                                tm.mastery_percent > 0 ? "bg-red-500" : "bg-slate-700"
+                                tm.mastery_percent > 0 ? "bg-red-500" : "bg-line-strong"
                               }`}
                               style={{ width: `${tm.status === "INSUFFICIENT_DATA" ? 0 : tm.mastery_percent}%` }}
                             />
                           </div>
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                          <div className="flex items-center justify-between text-[10px] text-ink-subtle pt-0.5">
                             <span>{tm.total_attempts} attempts ({tm.correct_count} correct)</span>
                             <button
                               onClick={() => handleSubtopicQuiz(tm.unit_number, tm.topic)}
@@ -2259,28 +2214,28 @@ export default function StudentPortal({ user, onLogout }) {
               )}
 
               {/* 5. REDESIGNED ADAPTIVE STUDY PLAN */}
-              <div className={`p-6 rounded-2xl border space-y-4 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+              <div className={`p-6 rounded-2xl border space-y-4 transition-all ds-card text-ink`}>
                 <div className="flex items-center justify-between">
-                  <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                  <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 text-ink-soft`}>
                     <Calendar className="h-4 w-4 text-indigo-500" /> Topic-Level Adaptive Study Plan
                   </h3>
                 </div>
 
-                <div className="flex flex-wrap items-end gap-3 p-4 rounded-xl border bg-slate-950/60 border-slate-800">
+                <div className="flex flex-wrap items-end gap-3 p-4 rounded-xl border bg-surface-sunken border-line">
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? "text-slate-300" : "text-slate-600"}`}>Target Exam Date</label>
+                    <label className={`block text-xs font-medium mb-1 text-ink-muted`}>Target Exam Date</label>
                     <input
                       type="date"
                       value={examDate}
                       onChange={(e) => setExamDate(e.target.value)}
-                      className={`px-3 py-2 rounded-lg border text-sm outline-none ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                      className={`px-3 py-2 rounded-lg border text-sm outline-none ds-field`}
                     />
                   </div>
                   <div className="flex-1 min-w-[200px]">
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? "text-slate-300" : "text-slate-600"}`}>Units to Cover</label>
+                    <label className={`block text-xs font-medium mb-1 text-ink-muted`}>Units to Cover</label>
                     <div className="flex flex-wrap gap-1.5">
                       {indexedUnits.map((u) => (
-                        <label key={u.unit_number} className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100"}`}>
+                        <label key={u.unit_number} className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer ds-field hover:bg-surface-sunken`}>
                           <input
                             type="checkbox"
                             checked={selectedPlanUnits.includes(u.unit_number)}
@@ -2311,7 +2266,7 @@ export default function StudentPortal({ user, onLogout }) {
                 {studyPlan && (
                   <div className="space-y-4 pt-3">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-slate-200">
+                      <p className="text-sm font-bold text-ink-soft">
                         📅 {studyPlan.total_days}-Day Adaptive Schedule (Exam: {studyPlan.exam_date})
                       </p>
                     </div>
@@ -2337,11 +2292,11 @@ export default function StudentPortal({ user, onLogout }) {
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2.5">
-                              <span className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-800 border border-slate-700 font-bold text-slate-200 text-xs flex-shrink-0">
+                              <span className="w-8 h-8 flex items-center justify-center rounded-full bg-surface-sunken border border-line-strong font-bold text-ink-soft text-xs flex-shrink-0">
                                 D{day.day}
                               </span>
                               <div>
-                                <span className="text-[10px] font-semibold text-slate-400">
+                                <span className="text-[10px] font-semibold text-ink-subtle">
                                   Unit {day.unit_number} · {day.date}
                                 </span>
                                 <h4 className="text-sm font-bold text-white line-clamp-1">{day.topic}</h4>
@@ -2356,13 +2311,13 @@ export default function StudentPortal({ user, onLogout }) {
                             </span>
                           </div>
 
-                          <div className="flex items-center justify-between text-xs text-slate-300 bg-slate-950/60 px-3 py-2 rounded-lg border border-slate-800">
+                          <div className="flex items-center justify-between text-xs text-ink-muted bg-surface-sunken px-3 py-2 rounded-lg border border-line">
                             <span>Activity: <strong className="text-white">{day.activity}</strong></span>
                             <span>Duration: <strong className="text-indigo-400">{day.duration_minutes} min</strong></span>
                           </div>
 
                           {day.why_evidence && (
-                            <p className="text-[11px] text-slate-400 italic bg-slate-900/40 p-2 rounded border border-slate-800/80">
+                            <p className="text-[11px] text-ink-subtle italic bg-surface-sunken p-2 rounded border border-line">
                               "{day.why_evidence}"
                             </p>
                           )}
@@ -2373,7 +2328,7 @@ export default function StudentPortal({ user, onLogout }) {
                                 setActiveTab("qa");
                                 setQaSubtopicSelect(day.topic);
                               }}
-                              className="flex-1 py-1 text-[11px] font-semibold rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-center transition"
+                              className="flex-1 py-1 text-[11px] font-semibold rounded bg-surface-sunken hover:bg-line text-ink-soft border border-line-strong text-center transition"
                             >
                               Study
                             </button>
@@ -2398,8 +2353,8 @@ export default function StudentPortal({ user, onLogout }) {
               </div>
 
               {/* 6. AI UNIT SUMMARIES */}
-              <div className={`p-6 rounded-2xl border space-y-4 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
-                <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+              <div className={`p-6 rounded-2xl border space-y-4 transition-all ds-card text-ink`}>
+                <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 text-ink-soft`}>
                   <BookMarked className="h-4 w-4 text-emerald-500" /> AI Unit Summaries
                 </h3>
 
@@ -2412,9 +2367,7 @@ export default function StudentPortal({ user, onLogout }) {
                       className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition ${
                         summaryUnit === u.unit_number
                           ? "bg-emerald-600 border-emerald-500 text-white"
-                          : isDark
-                          ? "bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800"
-                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                          : "bg-surface-sunken border-line text-ink-muted hover:bg-line/60"
                       }`}
                     >
                       Unit {u.unit_number}: {u.unit_name}
@@ -2425,17 +2378,17 @@ export default function StudentPortal({ user, onLogout }) {
                 {summaryLoading && (
                   <div className="text-center py-6">
                     <Loader2 className="h-8 w-8 text-emerald-500 animate-spin mx-auto" />
-                    <p className={`text-sm mt-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>Generating AI summary...</p>
+                    <p className={`text-sm mt-2 text-ink-subtle`}>Generating AI summary...</p>
                   </div>
                 )}
 
                 {unitSummary && !summaryLoading && (
-                  <div className={`p-5 rounded-xl border ${isDark ? "bg-emerald-950/30 border-emerald-800 text-slate-100" : "bg-emerald-50/50 border-emerald-200 text-slate-900"}`}>
+                  <div className={`p-5 rounded-xl border bg-success-soft border-success/30 text-ink`}>
                     <div className="flex items-center gap-2 mb-3">
                       <BookMarked className="h-4 w-4 text-emerald-500" />
                       <span className="text-xs font-bold text-emerald-400">
                         Unit {unitSummary.unit_number}: {unitSummary.unit_name}
-                        {unitSummary.cached && <span className="ml-2 text-[10px] text-slate-400">(cached)</span>}
+                        {unitSummary.cached && <span className="ml-2 text-[10px] text-ink-subtle">(cached)</span>}
                       </span>
                     </div>
                     <div className="prose-custom">
@@ -2457,15 +2410,15 @@ export default function StudentPortal({ user, onLogout }) {
           {/* ═══════════════ DOUBT HISTORY TAB ═══════════════ */}
           {activeTab === "history" && (
             <div className="space-y-4">
-              <div className={`p-6 rounded-2xl border space-y-4 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+              <div className={`p-6 rounded-2xl border space-y-4 transition-all ds-card text-ink`}>
                 <div className="flex items-center justify-between">
-                  <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                  <h3 className={`text-sm font-bold uppercase tracking-wider flex items-center gap-2 text-ink-soft`}>
                     <History className="h-4 w-4 text-purple-500" /> Doubt History
                   </h3>
                   <button
                     onClick={() => loadDoubtHistory(doubtSearch)}
                     disabled={doubtLoading}
-                    className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-200 transition disabled:opacity-50"
+                    className="flex items-center gap-1.5 text-xs font-semibold text-insight bg-insight-soft hover:bg-insight/15 px-3 py-1.5 rounded-lg border border-insight/30 transition disabled:opacity-50"
                   >
                     {doubtLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
                     Refresh
@@ -2475,14 +2428,14 @@ export default function StudentPortal({ user, onLogout }) {
                 {/* Search */}
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Search className="h-4 w-4 text-ink-subtle absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={doubtSearch}
                       onChange={(e) => setDoubtSearch(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && loadDoubtHistory(doubtSearch)}
                       placeholder="Search your past questions..."
-                      className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm outline-none ${isDark ? "bg-slate-950 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"}`}
+                      className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm outline-none ds-field`}
                     />
                   </div>
                   <button
@@ -2496,29 +2449,29 @@ export default function StudentPortal({ user, onLogout }) {
                 {doubtLoading && (
                   <div className="text-center py-6">
                     <Loader2 className="h-8 w-8 text-purple-500 animate-spin mx-auto" />
-                    <p className="text-sm text-slate-500 mt-2">Loading history...</p>
+                    <p className="text-sm text-ink-subtle mt-2">Loading history...</p>
                   </div>
                 )}
 
                 {doubtHistory && !doubtLoading && (
                   <>
-                    <p className="text-xs text-slate-400">{doubtHistory.total} question(s) found</p>
+                    <p className="text-xs text-ink-subtle">{doubtHistory.total} question(s) found</p>
                     {doubtHistory.items.length === 0 ? (
                       <div className="text-center py-8">
-                        <History className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                        <p className="text-sm text-slate-500">No questions asked yet. Go to "Study & Ask" to start!</p>
+                        <History className="h-10 w-10 text-ink-muted mx-auto mb-2" />
+                        <p className="text-sm text-ink-subtle">No questions asked yet. Go to "Study & Ask" to start!</p>
                       </div>
                     ) : (
                       <div className="space-y-2 max-h-[500px] overflow-y-auto">
                         {doubtHistory.items.map((d) => (
-                          <div key={d.id} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                          <div key={d.id} className="bg-surface-sunken rounded-xl border border-line overflow-hidden">
                             <button
                               onClick={() => setExpandedDoubt(expandedDoubt === d.id ? null : d.id)}
                               className="w-full text-left p-4 hover:bg-slate-100 transition"
                             >
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-semibold text-slate-800 truncate">{d.query}</p>
+                                  <p className="text-sm font-semibold text-ink truncate">{d.query}</p>
                                   <div className="flex items-center gap-2 mt-1">
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                                       d.mode === "analogy" ? "bg-amber-100 text-amber-700" :
@@ -2529,19 +2482,19 @@ export default function StudentPortal({ user, onLogout }) {
                                       {d.mode}
                                     </span>
                                     {d.unit_number && (
-                                      <span className="text-[10px] text-slate-400">Unit {d.unit_number}</span>
+                                      <span className="text-[10px] text-ink-subtle">Unit {d.unit_number}</span>
                                     )}
-                                    <span className="text-[10px] text-slate-400">{d.created_at}</span>
+                                    <span className="text-[10px] text-ink-subtle">{d.created_at}</span>
                                   </div>
                                 </div>
                                 {expandedDoubt === d.id
-                                  ? <ChevronDown className="h-4 w-4 text-slate-400 flex-shrink-0" />
-                                  : <ChevronRight className="h-4 w-4 text-slate-400 flex-shrink-0" />
+                                  ? <ChevronDown className="h-4 w-4 text-ink-subtle flex-shrink-0" />
+                                  : <ChevronRight className="h-4 w-4 text-ink-subtle flex-shrink-0" />
                                 }
                               </div>
                             </button>
                             {expandedDoubt === d.id && (
-                              <div className="px-4 pb-4 border-t border-slate-200">
+                              <div className="px-4 pb-4 border-t border-line">
                                 <div className="pt-3 prose-custom">
                                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                                     {d.answer}
