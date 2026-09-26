@@ -50,7 +50,7 @@ import MindMapVisualizer from "./MindMapVisualizer.jsx";
 import RevisionNotesView from "./RevisionNotesView.jsx";
 import InteractiveQuizView from "./InteractiveQuizView.jsx";
 import TimedMockExamView from "./TimedMockExamView.jsx";
-import NetworkCanvas from "./NetworkCanvas.jsx";
+import StudyBackground from "./StudyBackground.jsx";
 import WorkspaceHero from "./WorkspaceHero.jsx";
 import GamificationConstellation from "./GamificationConstellation.jsx";
 import RAGNodeVisualizer from "./RAGNodeVisualizer.jsx";
@@ -894,8 +894,8 @@ export default function StudentPortal({ user, onLogout }) {
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
       isDark ? "bg-[#0B1020] text-slate-100" : "bg-[#F8FAFC] text-slate-800"
     }`}>
-      {/* 60 FPS HTML5 Canvas Background Particle Network */}
-      <NetworkCanvas isDark={isDark} />
+      {/* Calm background: top glow, notebook lines on reading pages */}
+      <StudyBackground isDark={isDark} ruled={activeTab === "notes" && !showHero} />
 
       {/* Header */}
       <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ${
