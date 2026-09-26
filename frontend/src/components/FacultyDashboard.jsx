@@ -29,10 +29,54 @@ import {
   Zap,
   Users,
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { api } from "../api";
 import ThemeToggle from "./ThemeToggle.jsx";
-import NetworkCanvas from "./NetworkCanvas.jsx";
+
+const NAV_ITEMS = [
+  { id: "ingest", icon: UploadCloud, label: "Upload PDFs", hint: "Index syllabus material" },
+  { id: "qbank", icon: FileQuestion, label: "Question Generator", hint: "Build assignments with AI" },
+  { id: "analytics", icon: BarChart3, label: "Analytics", hint: "Cohort performance" },
+  { id: "versions", icon: History, label: "Versions & Units", hint: "Manage units and PDF history" },
+];
+
+// Soft ambient background: two slowly drifting glows over a faded dot grid.
+function FacultyBackdrop({ isDark }) {
+  const reduceMotion = useReducedMotion();
+  const drift = (x, y) =>
+    reduceMotion
+      ? {}
+      : {
+          animate: { x: [0, x, 0], y: [0, y, 0] },
+          transition: { duration: 24, repeat: Infinity, ease: "easeInOut" },
+        };
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+      <motion.div
+        {...drift(60, 40)}
+        className={`absolute -top-40 -left-32 w-[560px] h-[560px] rounded-full blur-3xl ${
+          isDark ? "bg-indigo-600/20" : "bg-indigo-300/30"
+        }`}
+      />
+      <motion.div
+        {...drift(-50, -30)}
+        className={`absolute -bottom-48 -right-24 w-[620px] h-[620px] rounded-full blur-3xl ${
+          isDark ? "bg-purple-700/15" : "bg-sky-200/40"
+        }`}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `radial-gradient(${isDark ? "rgba(148,163,184,0.10)" : "rgba(99,102,241,0.10)"} 1px, transparent 1px)`,
+          backgroundSize: "22px 22px",
+          maskImage: "radial-gradient(ellipse at top, black 30%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse at top, black 30%, transparent 75%)",
+        }}
+      />
+    </div>
+  );
+}
 
 export default function FacultyDashboard({ user, onLogout }) {
   // Theme state
@@ -322,180 +366,275 @@ export default function FacultyDashboard({ user, onLogout }) {
       ? Math.round(analytics.reduce((acc, curr) => acc + (curr.average_score_percent || 0), 0) / analytics.length)
       : 0;
 
+  const panelClass = isDark
+    ? "bg-slate-900/60 border-white/[0.06] backdrop-blur-xl"
+    : "bg-white/80 border-slate-200/80 backdrop-blur-xl";
+  const dividerClass = isDark ? "border-white/[0.06]" : "border-slate-200";
+
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  })();
+  const todayLabel = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  const initials = (user.name || "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+  const activeNav = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
+
+  const overviewStats = [
+    { label: "Syllabus units", value: totalUnits, hint: "Indexed course units", icon: BookOpen, tint: "text-indigo-400 bg-indigo-500/10" },
+    { label: "Indexed PDFs", value: indexedDocs, hint: "Active textbook documents", icon: FileText, tint: "text-cyan-400 bg-cyan-500/10" },
+    { label: "Cohort mastery", value: `${overallAvgMastery}%`, hint: "Class average accuracy", icon: Award, tint: "text-emerald-400 bg-emerald-500/10", progress: overallAvgMastery },
+    { label: "Student activity", value: totalStudentsAttempted, hint: "Total quiz attempts", icon: Users, tint: "text-purple-400 bg-purple-500/10" },
+  ];
+
+  const navButtonClass = (isActive) =>
+    `relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors cursor-pointer ${
+      isActive
+        ? isDark ? "text-white" : "text-indigo-950"
+        : isDark ? "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]" : "text-slate-500 hover:text-slate-900 hover:bg-slate-900/[0.03]"
+    }`;
+
+  const historyButtonClass = `p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
+    isDark
+      ? "bg-white/[0.03] border-white/[0.06] text-slate-400 hover:bg-white/[0.08] hover:text-white"
+      : "bg-white/70 border-slate-200 text-slate-500 hover:bg-white hover:text-slate-900"
+  }`;
+
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
-      isDark ? "bg-[#0B1020] text-slate-100" : "bg-[#F8FAFC] text-slate-800"
+    <div className={`min-h-screen font-sans transition-colors duration-300 relative ${
+      isDark ? "bg-[#070B16] text-slate-100" : "bg-[#F5F7FB] text-slate-800"
     }`}>
-      {/* 60 FPS HTML5 Canvas Background Particle Network */}
-      <NetworkCanvas isDark={isDark} />
+      <FacultyBackdrop isDark={isDark} />
 
-      {/* Header */}
-      <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ${
-        isDark ? "bg-slate-900/80 border-slate-800/80 backdrop-blur-md" : "bg-white/90 border-slate-200 backdrop-blur-md"
-      }`}>
-        <div className="flex items-center space-x-3">
-          {/* History Back & Forward Navigation Controls */}
-          <div className="flex items-center gap-1 mr-1">
-            <button
-              onClick={() => window.history.back()}
-              title="Go Back (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
-                isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-              }`}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => window.history.forward()}
-              title="Go Forward (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
-                isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
-              }`}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          <motion.div
-            whileHover={{ rotate: 10, scale: 1.05 }}
-            className="p-2.5 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/20"
-          >
-            <Briefcase className="h-6 w-6" />
-          </motion.div>
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight leading-tight flex items-center gap-2">
-              <span>Faculty Command Deck</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                PRO CONTROL
-              </span>
-            </h1>
-            <p className="text-xs opacity-60">
-              Prof. {user.name} {user.subject_name ? `· ${user.subject_name}` : ""}
-            </p>
-          </div>
-        </div>
-
-        {/* Header Actions & Theme Switcher */}
-        <div className="flex items-center gap-3">
-          <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onLogout}
-            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-2xl border transition cursor-pointer ${
-              isDark
-                ? "bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800"
-                : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
-            }`}
-          >
-            <LogOut className="h-3.5 w-3.5" /> Sign out
-          </motion.button>
-        </div>
-      </header>
-
-      {/* Main Command Deck Container */}
-      <div className="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6 z-10">
-        {/* Cohort Overview Metrics Banner */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Syllabus Units</span>
-              <BookOpen className="w-4 h-4 text-indigo-400" />
-            </div>
-            <div className="text-2xl font-black">{totalUnits}</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Indexed course units</p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Indexed PDFs</span>
-              <FileText className="w-4 h-4 text-cyan-400" />
-            </div>
-            <div className="text-2xl font-black">{indexedDocs}</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Active textbook documents</p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cohort Mastery</span>
-              <Award className="w-4 h-4 text-emerald-400" />
-            </div>
-            <div className="text-2xl font-black">{overallAvgMastery}%</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Class average accuracy</p>
-          </div>
-
-          <div className={`p-4 rounded-2xl border transition shadow-sm ${
-            isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-          }`}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Student Activity</span>
-              <Users className="w-4 h-4 text-purple-400" />
-            </div>
-            <div className="text-2xl font-black">{totalStudentsAttempted}</div>
-            <p className="text-[10px] text-slate-400 mt-0.5">Total quiz attempts</p>
-          </div>
-        </div>
-
-        {/* Command Deck Navigation Tabs */}
-        <div className={`flex rounded-2xl border shadow-sm overflow-x-auto relative p-1 transition ${
-          isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+      <div className="relative z-10 flex min-h-screen">
+        {/* Sidebar (desktop) */}
+        <aside className={`hidden lg:flex w-64 shrink-0 sticky top-0 h-screen flex-col gap-6 p-5 border-r backdrop-blur-xl ${
+          isDark ? "bg-slate-950/50 border-white/[0.06]" : "bg-white/60 border-slate-200/80"
         }`}>
-          {[
-            { id: "ingest", icon: UploadCloud, label: "PDF Ingestion & Syllabus" },
-            { id: "qbank", icon: FileQuestion, label: "AI Question Generator" },
-            { id: "analytics", icon: BarChart3, label: "Classroom Analytics" },
-            { id: "versions", icon: History, label: "Version Control & Units" },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`relative flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-colors z-10 cursor-pointer ${
-                  isActive
-                    ? isDark
-                      ? "text-white"
-                      : "text-blue-950"
-                    : isDark
-                    ? "text-slate-400 hover:text-slate-200"
-                    : "text-slate-600 hover:text-slate-900"
+          <div className="flex items-center gap-3 px-1">
+            <motion.div
+              whileHover={{ rotate: 8, scale: 1.05 }}
+              className="p-2.5 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/25"
+            >
+              <Briefcase className="h-5 w-5" />
+            </motion.div>
+            <div className="min-w-0">
+              <p className="text-sm font-extrabold tracking-tight leading-tight">Faculty Studio</p>
+              <p className="text-[11px] opacity-50 truncate">Syllabus AI Tutor</p>
+            </div>
+          </div>
+
+          <nav className="space-y-1">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.14em] opacity-40">Workspace</p>
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button key={item.id} onClick={() => setActiveTab(item.id)} className={navButtonClass(isActive)}>
+                  {isActive && (
+                    <motion.span
+                      layoutId="facultyNavActive"
+                      className={`absolute inset-0 rounded-xl border ${
+                        isDark ? "bg-indigo-500/15 border-indigo-400/20" : "bg-indigo-50 border-indigo-100"
+                      }`}
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    />
+                  )}
+                  {isActive && (
+                    <motion.span
+                      layoutId="facultyNavBar"
+                      className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-blue-500 to-purple-500"
+                      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                    />
+                  )}
+                  <Icon className={`relative w-4 h-4 shrink-0 ${isActive ? "text-indigo-400" : ""}`} />
+                  <span className="relative min-w-0">
+                    <span className="block leading-tight">{item.label}</span>
+                    <span className="block text-[11px] font-medium opacity-50 truncate">{item.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="mt-auto space-y-3">
+            <div className={`flex items-center gap-3 p-3 rounded-2xl border ${
+              isDark ? "bg-white/[0.03] border-white/[0.06]" : "bg-white/80 border-slate-200"
+            }`}>
+              <div className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-bold flex items-center justify-center">
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold truncate">Prof. {user.name}</p>
+                <p className="text-[11px] opacity-50 truncate">{user.subject_name || "Faculty"}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={onLogout}
+                className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-xl border transition cursor-pointer ${
+                  isDark
+                    ? "bg-white/[0.03] text-slate-300 border-white/[0.08] hover:bg-white/[0.08]"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                 }`}
               >
-                {isActive && (
-                  <motion.div
-                    layoutId="activeFacultyTabPill"
-                    className={`absolute inset-0 rounded-xl ${
-                      isDark ? "bg-indigo-600/40 border border-indigo-500/50 shadow-md" : "bg-blue-50 border border-blue-200 shadow-xs"
-                    }`}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <Icon className={`w-4 h-4 z-10 transition-transform ${isActive ? "scale-110 text-blue-500" : ""}`} />
-                <span className="z-10">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+                <LogOut className="h-3.5 w-3.5" /> Sign out
+              </motion.button>
+            </div>
+          </div>
+        </aside>
 
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Top bar (mobile & tablet) */}
+          <header className={`lg:hidden sticky top-0 z-20 border-b backdrop-blur-xl ${
+            isDark ? "bg-slate-950/70 border-white/[0.06]" : "bg-white/80 border-slate-200/80"
+          }`}>
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white">
+                  <Briefcase className="h-4 w-4" />
+                </div>
+                <p className="text-sm font-extrabold tracking-tight truncate">Faculty Studio</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+                <button
+                  onClick={onLogout}
+                  title="Sign out"
+                  className={`p-2 rounded-xl border cursor-pointer ${
+                    isDark ? "border-white/[0.08] text-slate-300" : "border-slate-200 text-slate-600"
+                  }`}
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <nav className="flex gap-1 px-3 pb-2 overflow-x-auto">
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer ${
+                      isActive ? (isDark ? "text-white" : "text-indigo-950") : "opacity-60"
+                    }`}
+                  >
+                    {isActive && (
+                      <motion.span
+                        layoutId="facultyMobileNavActive"
+                        className={`absolute inset-0 rounded-lg ${isDark ? "bg-indigo-500/20" : "bg-indigo-50"}`}
+                        transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                      />
+                    )}
+                    <Icon className="relative w-3.5 h-3.5" />
+                    <span className="relative">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </header>
+
+          <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8 space-y-6">
+            {/* Overview header */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="flex flex-wrap items-end justify-between gap-4"
+            >
+              <div className="space-y-1">
+                <p className="text-xs font-semibold opacity-50">{todayLabel}</p>
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                  {greeting},{" "}
+                  <span className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 bg-clip-text text-transparent">
+                    Prof. {user.name}
+                  </span>
+                </h1>
+                <p className="text-sm opacity-60">
+                  {user.subject_name ? `${user.subject_name} · ` : ""}Here's how your course is doing.
+                </p>
+              </div>
+              <div className="hidden sm:flex items-center gap-1">
+                <button onClick={() => window.history.back()} title="Go Back (Browser History)" className={historyButtonClass}>
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button onClick={() => window.history.forward()} title="Go Forward (Browser History)" className={historyButtonClass}>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </motion.div>
+
+            {/* Overview metrics */}
+            <motion.div
+              className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4"
+              initial="hidden"
+              animate="show"
+              variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } } }}
+            >
+              {overviewStats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <motion.div
+                    key={stat.label}
+                    variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+                    whileHover={{ y: -2 }}
+                    className={`p-4 sm:p-5 rounded-2xl border transition-shadow hover:shadow-lg ${panelClass}`}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[11px] font-bold opacity-50 uppercase tracking-wider">{stat.label}</span>
+                      <span className={`p-1.5 rounded-lg ${stat.tint}`}>
+                        <Icon className="w-4 h-4" />
+                      </span>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black tracking-tight">{stat.value}</div>
+                    {stat.progress !== undefined ? (
+                      <div className={`mt-2 h-1.5 rounded-full overflow-hidden ${isDark ? "bg-white/[0.06]" : "bg-slate-200"}`}>
+                        <motion.div
+                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${stat.progress}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-[11px] opacity-50 mt-1">{stat.hint}</p>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <activeNav.icon className="w-4 h-4 text-indigo-400" />
+              <h2 className="text-sm font-bold">{activeNav.label}</h2>
+              <span className="text-xs opacity-40">· {activeNav.hint}</span>
+            </div>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+              >
         {/* ═══════════════ TAB 1: PDF INGESTION & SYLLABUS ═══════════════ */}
         {activeTab === "ingest" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Upload Form */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${panelClass}`}>
+              <div className={`flex items-center gap-3 pb-3 border-b ${dividerClass}`}>
                 <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400">
                   <UploadCloud className="w-5 h-5" />
                 </div>
@@ -608,10 +747,8 @@ export default function FacultyDashboard({ user, onLogout }) {
             </div>
 
             {/* Indexed Documents Status List */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${panelClass}`}>
+              <div className={`flex items-center justify-between pb-3 border-b ${dividerClass}`}>
                 <div className="flex items-center gap-2.5">
                   <FileText className="w-5 h-5 text-cyan-400" />
                   <h3 className="text-base font-bold">Indexed Course Documents ({documents.length})</h3>
@@ -668,10 +805,8 @@ export default function FacultyDashboard({ user, onLogout }) {
         {/* ═══════════════ TAB 2: AI QUESTION BANK GENERATOR ═══════════════ */}
         {activeTab === "qbank" && (
           <div className="space-y-6">
-            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${panelClass}`}>
+              <div className={`flex items-center justify-between pb-3 border-b ${dividerClass}`}>
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-2xl bg-purple-500/20 text-purple-400">
                     <FileQuestion className="w-5 h-5" />
@@ -760,10 +895,8 @@ export default function FacultyDashboard({ user, onLogout }) {
 
             {/* Generated Question Bank Display */}
             {qbResult && (
-              <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${
-                isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-              }`}>
-                <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800/40">
+              <div className={`p-6 rounded-3xl border shadow-md space-y-5 transition ${panelClass}`}>
+                <div className={`flex flex-wrap items-center justify-between gap-4 pb-4 border-b ${dividerClass}`}>
                   <div>
                     <h4 className="text-base font-bold">
                       Generated Assignment: Unit {qbResult.unit_number} — {qbResult.unit_name}
@@ -844,10 +977,8 @@ export default function FacultyDashboard({ user, onLogout }) {
         {/* ═══════════════ TAB 3: CLASSROOM ANALYTICS ═══════════════ */}
         {activeTab === "analytics" && (
           <div className="space-y-6">
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${panelClass}`}>
+              <div className={`flex items-center justify-between pb-3 border-b ${dividerClass}`}>
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-2xl bg-emerald-500/20 text-emerald-400">
                     <BarChart3 className="w-5 h-5" />
@@ -896,7 +1027,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                             {a.average_score_percent}% average score ({a.students_attempted} student attempts)
                           </span>
                         </div>
-                        <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className={`w-full h-2.5 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-200"}`}>
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               a.average_score_percent >= 70
@@ -912,7 +1043,7 @@ export default function FacultyDashboard({ user, onLogout }) {
 
                       {/* Expanded: Difficult Topics */}
                       {expandedAnalytics === a.unit_number && enhanced && enhanced.difficult_topics.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-slate-800/40 space-y-2">
+                        <div className={`mt-4 pt-3 border-t space-y-2 ${dividerClass}`}>
                           <p className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">
                             Most Challenging Concepts for Students
                           </p>
@@ -947,10 +1078,8 @@ export default function FacultyDashboard({ user, onLogout }) {
         {activeTab === "versions" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Standalone Unit Manager */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${panelClass}`}>
+              <div className={`flex items-center gap-3 pb-3 border-b ${dividerClass}`}>
                 <div className="p-2.5 rounded-2xl bg-indigo-500/20 text-indigo-400">
                   <Plus className="w-5 h-5" />
                 </div>
@@ -1010,10 +1139,8 @@ export default function FacultyDashboard({ user, onLogout }) {
             </div>
 
             {/* PDF Version Control */}
-            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${
-              isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
-            }`}>
-              <div className="flex items-center gap-3 pb-3 border-b border-slate-800/40">
+            <div className={`p-6 rounded-3xl border shadow-md space-y-4 transition ${panelClass}`}>
+              <div className={`flex items-center gap-3 pb-3 border-b ${dividerClass}`}>
                 <div className="p-2.5 rounded-2xl bg-purple-500/20 text-purple-400">
                   <History className="w-5 h-5" />
                 </div>
@@ -1100,6 +1227,10 @@ export default function FacultyDashboard({ user, onLogout }) {
             </div>
           </div>
         )}
+              </motion.div>
+            </AnimatePresence>
+          </main>
+        </div>
       </div>
     </div>
   );
