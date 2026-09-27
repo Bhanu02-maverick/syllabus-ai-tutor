@@ -1,4 +1,5 @@
 import React, { useState, Component } from "react";
+import LandingPage from "./components/LandingPage.jsx";
 import Login from "./components/Login.jsx";
 import StudentPortal from "./components/StudentPortal.jsx";
 import FacultyDashboard from "./components/FacultyDashboard.jsx";
@@ -64,11 +65,13 @@ class ErrorBoundary extends Component {
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [authMode, setAuthMode] = useState(null); // null = LandingPage, "login" | "signup"
 
   React.useEffect(() => {
     const handleUnauthorized = () => {
       api.setToken(null);
       setUser(null);
+      setAuthMode(null);
     };
     window.addEventListener("vce_unauthorized", handleUnauthorized);
     return () => window.removeEventListener("vce_unauthorized", handleUnauthorized);
@@ -85,11 +88,26 @@ export default function App() {
   const handleLogout = () => {
     api.setToken(null);
     setUser(null);
+    setAuthMode(null);
   };
 
   const renderContent = () => {
     if (!user) {
-      return <Login onLogin={handleLogin} />;
+      if (authMode) {
+        return (
+          <Login
+            initialMode={authMode}
+            onLogin={handleLogin}
+            onBackToLanding={() => setAuthMode(null)}
+          />
+        );
+      }
+      return (
+        <LandingPage
+          onNavigateLogin={() => setAuthMode("login")}
+          onNavigateSignup={() => setAuthMode("signup")}
+        />
+      );
     }
 
     if (user.role === "admin") {

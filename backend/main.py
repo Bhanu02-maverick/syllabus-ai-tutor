@@ -1458,6 +1458,7 @@ def faculty_enhanced_analytics(
         # Identify difficult topics directly from tagged attempt history
         difficult_topics = []
         tagged_attempts = [a for a in attempts if a.topic_query and a.topic_query.strip()]
+        wrong_questions = [a.question for a in attempts if not a.is_correct and a.question]
 
         if tagged_attempts:
             # Direct exact measurement from attempt history

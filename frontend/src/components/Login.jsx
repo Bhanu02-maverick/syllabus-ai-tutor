@@ -5,6 +5,7 @@ import {
   Briefcase,
   BookOpen,
   ArrowRight,
+  ArrowLeft,
   Sparkles,
   AlertCircle,
   Loader2,
@@ -14,8 +15,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../api";
 import NaturalBackground from "./NaturalBackground.jsx";
 
-export default function Login({ onLogin }) {
-  const [mode, setMode] = useState("login"); // "login" or "signup"
+export default function Login({ onLogin, initialMode = "login", onBackToLanding }) {
+  const [mode, setMode] = useState(initialMode || "login");
+
+  useEffect(() => {
+    if (initialMode) {
+      setMode(initialMode);
+    }
+  }, [initialMode]);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("student");
@@ -76,6 +83,18 @@ export default function Login({ onLogin }) {
         transition={{ duration: 0.35, ease: "easeOut" }}
         className="w-full max-w-md bg-white border border-slate-200/90 shadow-2xl shadow-slate-200/60 rounded-3xl p-8 space-y-6 relative z-10"
       >
+        {/* Back to Home Button */}
+        {onBackToLanding && (
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition cursor-pointer -mt-2 mb-1"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Home</span>
+          </button>
+        )}
+
         {/* Header Branding */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-200 mb-1">

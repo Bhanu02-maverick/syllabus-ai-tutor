@@ -187,6 +187,14 @@ export default function StudentPortal({ user, onLogout }) {
     return localStorage.getItem("vce_theme") === "dark";
   });
 
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDark]);
+
   const toggleTheme = () => {
     setIsDark((prev) => {
       const next = !prev;
@@ -892,25 +900,25 @@ export default function StudentPortal({ user, onLogout }) {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
-      isDark ? "bg-[#0B1020] text-slate-100" : "bg-[#F8FAFC] text-slate-800"
+      isDark ? "dark bg-surface-dark text-slate-100" : "bg-surface-secondary text-slate-800"
     }`}>
       {/* 60 FPS HTML5 Canvas Background Particle Network */}
       <NetworkCanvas isDark={isDark} />
 
       {/* Header */}
-      <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ${
-        isDark ? "bg-slate-900/80 border-slate-800/80 backdrop-blur-md" : "bg-white/90 border-slate-200 backdrop-blur-md"
+      <header className={`sticky top-0 px-4 lg:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b transition-colors z-30 ${
+        isDark ? "bg-surface-dark/90 border-slate-800/80 backdrop-blur-xl" : "bg-white/90 border-slate-200/80 backdrop-blur-xl shadow-card"
       }`}>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center gap-3">
           {/* History Back & Forward Navigation Controls */}
-          <div className="flex items-center gap-1 mr-1">
+          <div className="flex items-center gap-0.5">
             <button
               onClick={() => window.history.back()}
               title="Go Back (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
+              className={`p-1.5 rounded-lg transition cursor-pointer flex items-center justify-center ${
                 isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+                  ? "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               }`}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -918,49 +926,49 @@ export default function StudentPortal({ user, onLogout }) {
             <button
               onClick={() => window.history.forward()}
               title="Go Forward (Browser History)"
-              className={`p-2 rounded-xl border transition cursor-pointer flex items-center justify-center ${
+              className={`p-1.5 rounded-lg transition cursor-pointer flex items-center justify-center ${
                 isDark
-                  ? "bg-slate-950/80 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white"
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900"
+                  ? "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  : "text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               }`}
             >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
 
-          <motion.div
-            whileHover={{ rotate: 10, scale: 1.05 }}
-            className="p-2.5 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-blue-500 text-white shadow-lg shadow-indigo-500/20"
-          >
-            <GraduationCap className="h-6 w-6" />
-          </motion.div>
+          <div className={`p-2 rounded-xl ${
+            isDark ? "bg-primary-500/10" : "bg-primary-50"
+          }`}>
+            <GraduationCap className="h-5 w-5 text-primary-500" />
+          </div>
           <div>
-            <h1 className="text-xl font-extrabold tracking-tight leading-tight flex items-center gap-2">
+            <h1 className="text-base font-bold tracking-tight leading-tight flex items-center gap-2">
               <span>VCE AI Tutor</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <span className={`text-[10px] px-1.5 py-px rounded font-semibold ${
+                isDark ? "bg-primary-500/15 text-primary-400" : "bg-primary-50 text-primary-600"
+              }`}>
                 PRO
               </span>
             </h1>
-            <p className="text-xs opacity-60">Syllabus-Bound Adaptive Platform · Welcome, {user.name}</p>
+            <p className={`text-xs ${
+              isDark ? "text-slate-500" : "text-slate-400"
+            }`}>Welcome, {user.name}</p>
           </div>
         </div>
 
         {/* Course / Subject Selector */}
-        <div className={`flex items-center gap-2.5 px-4 py-2 rounded-2xl text-xs font-bold border transition ${
-          isDark
-            ? "bg-slate-950/80 border-indigo-500/30 text-indigo-300 shadow-sm"
-            : "bg-indigo-50 border-indigo-200 text-indigo-900 shadow-xs"
-        }`}>
-          <BookOpen className="h-4 w-4 text-indigo-500 flex-shrink-0" />
-          <span className="opacity-80">Course:</span>
+        <div className="flex items-center gap-2">
+          <BookOpen className={`h-4 w-4 flex-shrink-0 ${
+            isDark ? "text-slate-500" : "text-slate-400"
+          }`} />
           {facultyList.length === 0 ? (
-            <span className="text-amber-500 italic">No courses available</span>
+            <span className="text-xs text-warning-600 italic font-medium">No courses available</span>
           ) : (
             <select
               value={selectedFacultyId || ""}
               onChange={(e) => setSelectedFacultyId(Number(e.target.value))}
-              className={`font-extrabold rounded-xl px-3 py-1 text-xs focus:outline-none transition cursor-pointer ${
-                isDark ? "bg-slate-900 text-indigo-200 border border-indigo-500/40" : "bg-white text-indigo-950 border border-slate-300"
+              className={`vce-select text-xs font-semibold py-1.5 min-w-[180px] ${
+                isDark ? "bg-surface-dark-secondary border-slate-700 text-slate-200" : ""
               }`}
             >
               {facultyList.map((f) => (
@@ -972,35 +980,33 @@ export default function StudentPortal({ user, onLogout }) {
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowHero(!showHero)}
-            className={`flex items-center gap-1.5 text-xs font-bold px-3.5 py-2 rounded-2xl border transition cursor-pointer ${
+            className={`vce-btn vce-btn-sm ${
               showHero
-                ? "bg-indigo-600 text-white border-indigo-500 shadow-md"
+                ? "bg-primary-600 text-white border-primary-500 shadow-sm"
                 : isDark
-                ? "bg-slate-800/80 text-indigo-300 border-indigo-500/30 hover:bg-slate-800"
-                : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
             }`}
           >
-            <Sparkles className="h-3.5 w-3.5" /> ✦ Entrance Hero
+            <Sparkles className="h-3.5 w-3.5" /> Hero
           </button>
 
           {/* Light / Dark Mode Toggle */}
           <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <button
             onClick={onLogout}
-            className={`flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-2xl border transition cursor-pointer ${
+            className={`vce-btn vce-btn-sm ${
               isDark
-                ? "bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-800"
-                : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
+                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
             }`}
           >
             <LogOut className="h-3.5 w-3.5" /> Sign out
-          </motion.button>
+          </button>
         </div>
       </header>
 
@@ -1013,17 +1019,19 @@ export default function StudentPortal({ user, onLogout }) {
         )}
       </AnimatePresence>
 
-      <div className={`flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col md:flex-row gap-6 z-10 ${showHero ? "hidden" : ""}`}>
+      <div className={`flex-1 max-w-8xl w-full mx-auto px-4 lg:px-6 py-5 flex flex-col md:flex-row gap-5 z-10 ${showHero ? "hidden" : ""}`}>
         {/* ─── Left Sidebar Navigation ─── */}
-        <aside className={`w-full md:w-72 flex-shrink-0 p-5 rounded-3xl border shadow-md space-y-6 h-fit transition ${
-          isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+        <aside className={`vce-sidebar ${
+          isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""
         }`}>
           {/* Section 1: Syllabus Units */}
           <div>
-            <h2 className="text-xs font-black uppercase tracking-wider mb-3 flex items-center gap-2 opacity-80">
-              <BookOpen className="h-4 w-4 text-indigo-500" /> Syllabus Units
+            <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
+              isDark ? "text-slate-500" : "text-slate-400"
+            }`}>
+              Syllabus Units
             </h2>
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-56 overflow-y-auto pr-1 no-scrollbar">
               {units.length === 0 && (
                 <p className="text-xs opacity-50 italic">No units uploaded yet.</p>
               )}
@@ -1031,11 +1039,11 @@ export default function StudentPortal({ user, onLogout }) {
                 <div key={u.unit_number} className="group">
                   <button
                     onClick={() => u.indexed && handleToggleUnit(u.unit_number)}
-                    className={`w-full text-left p-3 rounded-2xl border transition ${
+                    className={`w-full text-left p-2.5 rounded-xl border transition ${
                       u.indexed
                         ? isDark
-                          ? "bg-slate-950/60 border-slate-800 hover:border-indigo-500/50 cursor-pointer"
-                          : "bg-slate-50 border-slate-100 hover:border-blue-300 cursor-pointer"
+                          ? "bg-slate-900/60 border-slate-800 hover:border-primary-500/40 cursor-pointer"
+                          : "bg-surface-secondary border-slate-100 hover:border-primary-300 cursor-pointer"
                         : "opacity-40 cursor-default"
                     }`}
                   >
@@ -1059,15 +1067,17 @@ export default function StudentPortal({ user, onLogout }) {
                     <p className="text-[11px] opacity-70 mt-1 ml-5 font-medium truncate">{u.unit_name}</p>
 
                     {u.indexed && (
-                      <div className="mt-2 ml-5">
-                        <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="mt-1.5 ml-5">
+                        <div className={`w-full h-1 rounded-full overflow-hidden ${
+                          isDark ? "bg-slate-800" : "bg-slate-200"
+                        }`}>
                           <div
                             className={`h-full rounded-full transition-all duration-500 ${
                               u.mastery_percent >= 80
-                                ? "bg-emerald-500"
+                                ? "bg-success-500"
                                 : u.mastery_percent >= 40
-                                ? "bg-amber-500"
-                                : "bg-indigo-500"
+                                ? "bg-warning-500"
+                                : "bg-primary-500"
                             }`}
                             style={{ width: `${Math.max(u.mastery_percent, 3)}%` }}
                           />
@@ -1131,10 +1141,12 @@ export default function StudentPortal({ user, onLogout }) {
 
           {/* Section 2: Sidebar Navigation Tabs */}
           <div>
-            <h2 className="text-xs font-black uppercase tracking-wider mb-3 flex items-center gap-2 opacity-80">
-              <Sparkles className="h-4 w-4 text-indigo-500" /> Navigation Menu
+            <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
+              isDark ? "text-slate-500" : "text-slate-400"
+            }`}>
+              Navigation
             </h2>
-            <div className="space-y-1.5">
+            <div className="space-y-0.5">
               {[
                 { id: "study", icon: Brain, label: "Study & Ask" },
                 { id: "mindmap", icon: Network, label: "Mind Maps" },
@@ -1150,26 +1162,26 @@ export default function StudentPortal({ user, onLogout }) {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-xs font-bold transition relative cursor-pointer ${
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition relative cursor-pointer ${
                       isActive
                         ? isDark
-                          ? "text-white font-extrabold"
-                          : "text-indigo-950 font-extrabold"
+                          ? "text-white font-semibold"
+                          : "text-primary-700 font-semibold"
                         : isDark
-                        ? "text-slate-400 hover:text-slate-200"
-                        : "text-slate-600 hover:text-slate-900"
+                        ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
                     }`}
                   >
                     {isActive && (
                       <motion.div
                         layoutId="activeSidebarTabPill"
-                        className={`absolute inset-0 rounded-2xl ${
-                          isDark ? "bg-indigo-600/30 border border-indigo-500/40 shadow-sm" : "bg-blue-50 border border-blue-200 shadow-xs"
+                        className={`absolute inset-0 rounded-xl ${
+                          isDark ? "bg-primary-500/10 border border-primary-500/20" : "bg-primary-50 border border-primary-100"
                         }`}
                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
                       />
                     )}
-                    <Icon className={`w-4 h-4 z-10 transition-transform ${isActive ? "scale-110 text-indigo-400" : ""}`} />
+                    <Icon className={`w-4 h-4 z-10 transition-colors ${isActive ? (isDark ? "text-primary-400" : "text-primary-600") : ""}`} />
                     <span className="z-10">{tab.label}</span>
                   </button>
                 );
@@ -1178,20 +1190,27 @@ export default function StudentPortal({ user, onLogout }) {
           </div>
 
           {/* Section 3: Compact Progress Pill */}
-          <div className={`p-4 rounded-2xl border space-y-2 transition ${
-            isDark ? "bg-slate-950/80 border-slate-800" : "bg-slate-50 border-slate-200"
+          <div className={`vce-divider ${isDark ? "!bg-slate-800" : ""}`} />
+          <div className={`p-3.5 rounded-xl border space-y-2 transition ${
+            isDark ? "bg-slate-900/60 border-slate-800" : "bg-surface-tertiary border-slate-100"
           }`}>
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-amber-400 flex items-center gap-1">
-                <Flame className="w-4 h-4 animate-bounce" /> {gamification?.streak_days || 0} Days Streak
+              <span className={`font-semibold flex items-center gap-1 ${
+                isDark ? "text-amber-400" : "text-amber-600"
+              }`}>
+                <Flame className="w-3.5 h-3.5" /> {gamification?.streak_days || 0} Day Streak
               </span>
-              <span className="font-bold text-indigo-400">
-                Level {gamification?.level || 1} ({gamification?.xp || 0} XP)
+              <span className={`font-semibold ${
+                isDark ? "text-primary-400" : "text-primary-600"
+              }`}>
+                Lv.{gamification?.level || 1} · {gamification?.xp || 0} XP
               </span>
             </div>
-            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div className={`w-full h-1.5 rounded-full overflow-hidden ${
+              isDark ? "bg-slate-800" : "bg-slate-200"
+            }`}>
               <div
-                className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-amber-500 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-primary-500 via-purple-500 to-amber-500 rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(((gamification?.xp || 0) / (gamification?.next_level_xp || 100)) * 100, 100)}%` }}
               />
             </div>
@@ -1204,13 +1223,17 @@ export default function StudentPortal({ user, onLogout }) {
           {/* ═══════════════ STUDY TAB ═══════════════ */}
           {activeTab === "study" && (
             <>
-              <div className={`p-6 rounded-2xl border transition-all ${isDark ? "bg-slate-900/90 border-slate-800/80 shadow-2xl text-slate-100" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
+              <div className={`vce-card p-5 ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}>
                 <form onSubmit={handleAsk} className="space-y-4">
                   {/* Topic Filter Selector */}
-                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl border ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl border ${
+                    isDark ? "bg-slate-900/60 border-slate-800" : "bg-surface-tertiary border-slate-100"
+                  }`}>
                     <div>
-                      <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-600"}`}>
-                        🎯 Target Unit (Optional):
+                      <label className={`block text-xs font-medium mb-1.5 ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}>
+                        Target Unit
                       </label>
                       <select
                         value={qaUnitSelect}
@@ -1218,7 +1241,9 @@ export default function StudentPortal({ user, onLogout }) {
                           setQaUnitSelect(e.target.value);
                           setQaSubtopicSelect("");
                         }}
-                        className={`w-full border rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                        className={`vce-select text-xs ${
+                          isDark ? "bg-surface-dark border-slate-700 text-white" : ""
+                        }`}
                       >
                         <option value="">All Syllabus Units</option>
                         {units.map((u) => (
@@ -1230,97 +1255,111 @@ export default function StudentPortal({ user, onLogout }) {
                     </div>
 
                     <div>
-                      <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-600"}`}>
-                        🔍 Specific Subtopic (Optional):
+                      <label className={`block text-xs font-medium mb-1.5 ${
+                        isDark ? "text-slate-400" : "text-slate-500"
+                      }`}>
+                        Specific Subtopic
                       </label>
                       <input
                         type="text"
                         value={qaSubtopicSelect}
                         onChange={(e) => setQaSubtopicSelect(e.target.value)}
                         placeholder="e.g. Stemming, CPU Scheduling..."
-                        className={`w-full border rounded-lg px-3 py-2 text-xs font-medium outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? "bg-slate-900 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"}`}
+                        className={`vce-input text-xs ${
+                          isDark ? "bg-surface-dark border-slate-700 text-white placeholder-slate-500" : ""
+                        }`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className={`block text-sm font-bold mb-2 ${isDark ? "text-slate-200" : "text-slate-700"}`}>
-                      Ask Question from Prescribed Syllabus
+                    <label className={`block text-sm font-semibold mb-1.5 ${
+                      isDark ? "text-slate-200" : "text-slate-700"
+                    }`}>
+                      Ask a Question
                     </label>
                     <input
                       type="text"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       placeholder="e.g., Define Round Robin CPU Scheduling and its time quantum..."
-                      className={`w-full px-4 py-3 rounded-xl border outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium ${isDark ? "bg-slate-950 border-slate-700 text-white placeholder-slate-500" : "bg-white border-slate-300 text-slate-900 placeholder-slate-400"}`}
+                      className={`vce-input ${
+                        isDark ? "bg-surface-dark border-slate-700 text-white placeholder-slate-500" : ""
+                      }`}
                     />
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div className={`flex items-center space-x-2 p-1 rounded-lg border text-xs font-semibold ${isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className={`flex items-center p-0.5 rounded-lg border text-xs font-medium ${
+                      isDark ? "bg-slate-900 border-slate-800" : "bg-surface-tertiary border-slate-200"
+                    }`}>
                       <button
                         type="button"
                         onClick={() => setMode("exam")}
-                        className={`px-3 py-1.5 rounded-md transition ${
+                        className={`px-3 py-1.5 rounded-md transition cursor-pointer ${
                           mode === "exam"
                             ? isDark
-                              ? "bg-indigo-600 text-white shadow-sm"
-                              : "bg-white text-blue-700 shadow-sm"
+                              ? "bg-primary-600 text-white shadow-sm"
+                              : "bg-white text-primary-700 shadow-sm"
                             : isDark
                             ? "text-slate-400 hover:text-white"
-                            : "text-slate-600 hover:text-slate-900"
+                            : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
-                        📝 Exam Mode
+                        Exam Mode
                       </button>
                       <button
                         type="button"
                         onClick={() => setMode("analogy")}
-                        className={`px-3 py-1.5 rounded-md transition ${
+                        className={`px-3 py-1.5 rounded-md transition cursor-pointer ${
                           mode === "analogy"
                             ? isDark
                               ? "bg-amber-600 text-white shadow-sm"
-                              : "bg-white text-amber-600 shadow-sm"
+                              : "bg-white text-amber-700 shadow-sm"
                             : isDark
                             ? "text-slate-400 hover:text-white"
-                            : "text-slate-600 hover:text-slate-900"
+                            : "text-slate-500 hover:text-slate-800"
                         }`}
                       >
-                        💡 Analogy Mode
+                        Analogy Mode
                       </button>
                     </div>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition disabled:opacity-50 shadow-md cursor-pointer"
+                      className="vce-btn-primary vce-btn-sm"
                     >
-                      {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {loading ? "Searching Textbook..." : "Ask Syllabus AI"}
+                      {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {loading ? "Searching..." : "Ask Syllabus AI"}
                     </button>
                   </div>
                 </form>
               </div>
 
-              {/* Beautiful Answer Card */}
+              {/* Answer Card */}
               {result && (
-                <div className={`rounded-2xl border overflow-hidden transition-all ${isDark ? "bg-slate-900/90 border-slate-800 shadow-2xl text-slate-100" : "bg-white border-slate-200 shadow-sm text-slate-900"}`}>
+                <div className={`vce-card overflow-hidden ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}>
                   {/* Gradient accent bar */}
-                  <div className="h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-emerald-500" />
+                  <div className="h-0.5 bg-gradient-to-r from-primary-500 via-accent-500 to-success-500" />
 
-                  <div className="p-6 space-y-4">
+                  <div className="p-5 space-y-4">
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4 text-blue-600" />
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <Sparkles className={`h-4 w-4 ${isDark ? "text-primary-400" : "text-primary-500"}`} />
+                        <span className={`text-xs font-semibold uppercase tracking-wider ${
+                          isDark ? "text-slate-400" : "text-slate-500"
+                        }`}>
                           {mode === "analogy" ? "Analogy Explanation" : "Verified Answer"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         {result.citations.map((c, i) => (
                           <span
                             key={i}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md border border-emerald-200"
+                            className={`vce-badge-success text-[10px] ${
+                              isDark ? "" : ""
+                            }`}
                           >
                             <FileText className="h-3 w-3" /> Page {c.page} · {c.source}
                           </span>
@@ -1341,31 +1380,47 @@ export default function StudentPortal({ user, onLogout }) {
 
                     {/* Feature 7: Explain-Again Buttons */}
                     {lastQuery && (
-                      <div className="pt-3 border-t border-slate-100 flex items-center gap-3 flex-wrap">
-                        <span className="text-[11px] text-slate-400 font-medium">Re-explain:</span>
+                      <div className={`pt-3 border-t flex items-center gap-2.5 flex-wrap ${
+                        isDark ? "border-slate-800" : "border-slate-100"
+                      }`}>
+                        <span className={`text-[11px] font-medium ${
+                          isDark ? "text-slate-500" : "text-slate-400"
+                        }`}>Re-explain:</span>
                         <button
                           onClick={() => handleExplainAgain("simpler")}
                           disabled={explainLoading}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg border border-amber-200 transition disabled:opacity-50"
+                          className={`vce-btn vce-btn-sm ${
+                            isDark
+                              ? "bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20"
+                              : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                          } disabled:opacity-50`}
                         >
                           {explainLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                          🔄 Explain Simpler
+                          Simpler
                         </button>
                         <button
                           onClick={() => handleExplainAgain("detailed")}
                           disabled={explainLoading}
-                          className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg border border-purple-200 transition disabled:opacity-50"
+                          className={`vce-btn vce-btn-sm ${
+                            isDark
+                              ? "bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20"
+                              : "bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100"
+                          } disabled:opacity-50`}
                         >
                           {explainLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <BookMarked className="h-3 w-3" />}
-                          📚 More Detail
+                          More Detail
                         </button>
                       </div>
                     )}
 
                     {/* Source info footer */}
                     {result.unit_number && (
-                      <div className="pt-3 border-t border-slate-100">
-                        <p className="text-[11px] text-slate-400">
+                      <div className={`pt-3 border-t ${
+                        isDark ? "border-slate-800" : "border-slate-100"
+                      }`}>
+                        <p className={`text-[11px] ${
+                          isDark ? "text-slate-500" : "text-slate-400"
+                        }`}>
                           Sourced from Unit {result.unit_number} · Syllabus-verified response
                         </p>
                       </div>
@@ -1384,21 +1439,32 @@ export default function StudentPortal({ user, onLogout }) {
           {/* ═══════════════ MIND MAPS TAB ═══════════════ */}
           {activeTab === "mindmap" && (
             <div className="space-y-6">
-              <div className={`p-6 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
-                <div>
-                  <h3 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}>
-                    <Network className="h-5 w-5 text-indigo-400" /> Interactive AI Mind Map
-                  </h3>
-                  <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>Visual PDF syllabus hierarchy. Click concept nodes to Explain, see Examples, or Quiz yourself.</p>
-                </div>
+              <div
+                className={`vce-card p-5 flex flex-wrap items-center justify-between gap-4 ${
+                  isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+                }`}
+              >
                 <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20">
+                    <Network className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                      Interactive AI Mind Map
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Visual syllabus knowledge tree. Click concept nodes for deep explanations, real-world examples, or micro-quizzes.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5">
                   <select
                     value={mindMapUnit}
                     onChange={(e) => {
                       setMindMapUnit(e.target.value);
                       handleLoadMindMap(e.target.value);
                     }}
-                    className={`px-3 py-2 rounded-xl border text-xs font-semibold outline-none ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                    className="vce-select text-xs min-w-[220px]"
                   >
                     {units.map((u) => (
                       <option key={u.unit_number} value={u.unit_number}>
@@ -1409,18 +1475,29 @@ export default function StudentPortal({ user, onLogout }) {
                   <button
                     onClick={() => handleLoadMindMap(mindMapUnit)}
                     disabled={mindMapLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                    className="vce-btn vce-btn-primary vce-btn-sm"
                   >
-                    {mindMapLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    {mindMapLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                     {mindMapLoading ? "Generating..." : "Generate Mind Map"}
                   </button>
                 </div>
               </div>
 
               {mindMapLoading ? (
-                <div className="bg-white p-12 rounded-xl border border-slate-200 text-center space-y-3">
-                  <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700">Structuring syllabus topics into interactive tree...</p>
+                <div
+                  className={`vce-card p-12 text-center space-y-4 ${
+                    isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center mx-auto border border-primary-500/20">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    Structuring syllabus topics into interactive tree...
+                  </p>
+                  <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto overflow-hidden">
+                    <div className="h-full bg-primary-600 rounded-full animate-pulse" style={{ width: "70%" }} />
+                  </div>
                 </div>
               ) : mindMapData ? (
                 <MindMapVisualizer
@@ -1432,8 +1509,28 @@ export default function StudentPortal({ user, onLogout }) {
                   isCached={mindMapData.cached}
                 />
               ) : (
-                <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500 text-sm">
-                  Select a unit above to view its interactive AI Mind Map.
+                <div
+                  className={`vce-card p-12 text-center space-y-4 max-w-xl mx-auto ${
+                    isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center mx-auto border border-primary-500/20">
+                    <Network className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
+                      Explore Interactive Concept Mind Map
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Select any syllabus unit above and generate an interactive concept tree.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleLoadMindMap(mindMapUnit || (units[0] && units[0].unit_number))}
+                    className="vce-btn vce-btn-primary vce-btn-sm"
+                  >
+                    Generate Unit {mindMapUnit || 1} Mind Map
+                  </button>
                 </div>
               )}
             </div>
@@ -1442,21 +1539,32 @@ export default function StudentPortal({ user, onLogout }) {
           {/* ═══════════════ REVISION NOTES TAB ═══════════════ */}
           {activeTab === "notes" && (
             <div className="space-y-6">
-              <div className={`p-6 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
-                <div>
-                  <h3 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? "text-white" : "text-slate-900"}`}>
-                    <BookMarked className="h-5 w-5 text-blue-400" /> AI Syllabus Revision Notes
-                  </h3>
-                  <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>High-yield exam points, key definitions, formulas, and expected questions generated from PDF context.</p>
-                </div>
+              <div
+                className={`vce-card p-5 flex flex-wrap items-center justify-between gap-4 ${
+                  isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+                }`}
+              >
                 <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-accent-500/10 text-accent-600 dark:text-accent-400 border border-accent-500/20">
+                    <BookMarked className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                      AI Syllabus Revision Notes
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      High-yield exam points, key definitions, formulas, and expected questions generated from PDF context.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5">
                   <select
                     value={notesUnit}
                     onChange={(e) => {
                       setNotesUnit(e.target.value);
                       handleLoadNotes(e.target.value);
                     }}
-                    className={`px-3 py-2 rounded-xl border text-xs font-semibold outline-none ${isDark ? "bg-slate-950 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
+                    className="vce-select text-xs min-w-[220px]"
                   >
                     {units.map((u) => (
                       <option key={u.unit_number} value={u.unit_number}>
@@ -1467,58 +1575,59 @@ export default function StudentPortal({ user, onLogout }) {
                   <button
                     onClick={() => handleLoadNotes(notesUnit)}
                     disabled={notesLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                    className="vce-btn vce-btn-primary vce-btn-sm"
                   >
-                    {notesLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {notesLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     {notesLoading ? "Generating..." : "Generate Notes"}
                   </button>
                 </div>
               </div>
 
               {notesLoading ? (
-                <div className="bg-white p-12 rounded-xl border border-slate-200 text-center space-y-3">
-                  <Loader2 className="h-8 w-8 text-blue-600 animate-spin mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700">Synthesizing high-yield exam revision notes...</p>
+                <div
+                  className={`vce-card p-12 text-center space-y-4 ${
+                    isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-accent-500/10 text-accent-600 dark:text-accent-400 flex items-center justify-center mx-auto border border-accent-500/20">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    Synthesizing high-yield exam revision notes...
+                  </p>
+                  <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto overflow-hidden">
+                    <div className="h-full bg-accent-500 rounded-full animate-pulse" style={{ width: "65%" }} />
+                  </div>
                 </div>
               ) : revisionNotesData ? (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                      Unit {revisionNotesData.unit_number}: {revisionNotesData.unit_name} Revision Sheet
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {revisionNotesData.cached && (
-                        <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-                          ⚡ Instant Cached
-                        </span>
-                      )}
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(revisionNotesData.notes_markdown);
-                          setCopiedNotes(true);
-                          setTimeout(() => setCopiedNotes(false), 2000);
-                        }}
-                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition"
-                      >
-                        {copiedNotes ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                        {copiedNotes ? "Copied!" : "Copy Notes"}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="prose-custom">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm, remarkMath]}
-                      rehypePlugins={[rehypeRaw, [rehypeKatex, { strict: false, throwOnError: false }]]}
-                      components={markdownComponents}
-                    >
-                      {preprocessLaTeX(revisionNotesData.notes_markdown)}
-                    </ReactMarkdown>
-                  </div>
-                </div>
+                <RevisionNotesView
+                  notesData={revisionNotesData}
+                  isDark={isDark}
+                  markdownComponents={markdownComponents}
+                />
               ) : (
-                <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500 text-sm">
-                  Select a unit to view syllabus-bound revision notes.
+                <div
+                  className={`vce-card p-12 text-center space-y-4 max-w-xl mx-auto ${
+                    isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
+                  }`}
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-accent-500/10 text-accent-600 dark:text-accent-400 flex items-center justify-center mx-auto border border-accent-500/20">
+                    <BookMarked className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-extrabold text-slate-900 dark:text-white">
+                      Synthesize High-Yield Revision Notes
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Select any syllabus unit to generate textbook-quality revision summaries and key formulas.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleLoadNotes(notesUnit || (units[0] && units[0].unit_number))}
+                    className="vce-btn vce-btn-primary vce-btn-sm"
+                  >
+                    Generate Unit {notesUnit || 1} Notes
+                  </button>
                 </div>
               )}
             </div>
@@ -1749,230 +1858,36 @@ export default function StudentPortal({ user, onLogout }) {
 
           {/* ═══════════════ QUIZ TAB ═══════════════ */}
           {activeTab === "quiz" && (
-
-            <>
-              {/* Quiz Configuration */}
-              {quizzes.length === 0 && (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
-                  <div className="text-center space-y-2">
-                    <HelpCircle className="h-10 w-10 text-blue-500 mx-auto" />
-                    <h3 className="text-lg font-bold text-slate-900">Take a Quiz</h3>
-                    <p className="text-sm text-slate-500 max-w-md mx-auto">
-                      Test your knowledge on any unit. Select a unit, choose how many questions,
-                      and challenge yourself!
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-end justify-center gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
-                        Unit
-                      </label>
-                      <select
-                        value={quizUnitSelect}
-                        onChange={(e) => setQuizUnitSelect(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-slate-300 text-sm min-w-[200px]"
-                      >
-                        {indexedUnits.map((u) => (
-                          <option key={u.unit_number} value={u.unit_number}>
-                            Unit {u.unit_number} — {u.unit_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
-                        Questions
-                      </label>
-                      <select
-                        value={quizNumQuestions}
-                        onChange={(e) => setQuizNumQuestions(Number(e.target.value))}
-                        className="px-3 py-2 rounded-lg border border-slate-300 text-sm"
-                      >
-                        <option value={2}>2 questions</option>
-                        <option value={5}>5 questions</option>
-                        <option value={10}>10 questions</option>
-                        <option value={15}>15 questions</option>
-                        <option value={20}>20 questions</option>
-                        <option value={25}>25 questions</option>
-                        <option value={30}>30 questions</option>
-                        <option value={50}>50 questions</option>
-                      </select>
-                    </div>
-                    <button
-                      onClick={handleStartQuiz}
-                      disabled={quizLoading || indexedUnits.length === 0}
-                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold px-6 py-2 rounded-lg transition"
-                    >
-                      {quizLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {quizLoading ? "Generating..." : "Start Quiz"}
-                    </button>
-                  </div>
-
-                  {indexedUnits.length === 0 && (
-                    <p className="text-center text-xs text-amber-600">
-                      No units with indexed content available. Faculty must upload PDFs first.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Quiz Error Display */}
-              {quizError && quizzes.length === 0 && !quizLoading && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-5 text-center space-y-3">
-                  <div className="text-red-500 text-3xl">⚠️</div>
-                  <p className="text-sm font-semibold text-red-700">{quizError}</p>
-                  <p className="text-xs text-red-500">
-                    This usually happens when the AI service is busy or rate-limited. Try again with fewer questions.
-                  </p>
-                  <button
-                    onClick={() => { setQuizError(null); }}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Dismiss & Try Again
-                  </button>
-                </div>
-              )}
-
-              {/* Quiz Loading Animation */}
-              {quizLoading && quizzes.length === 0 && (
-                <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center space-y-4">
-                  <div className="flex justify-center">
-                    <Loader2 className="h-10 w-10 text-blue-500 animate-spin" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">Generating your quiz...</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      The AI is crafting {quizNumQuestions} questions from your syllabus. This may take 15-60 seconds.
-                    </p>
-                  </div>
-                  <div className="flex justify-center gap-1">
-                    {[0, 1, 2, 3, 4].map(i => (
-                      <div
-                        key={i}
-                        className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"
-                        style={{ animationDelay: `${i * 0.15}s` }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {quizzes.length > 0 && (
-                <div className="space-y-4">
-                  {/* Quiz header */}
-                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <ClipboardList className="h-5 w-5 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">
-                          {quizzes.length} Question Quiz
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          Unit {quizUnit} · Answer all questions then submit
-                        </p>
-                      </div>
-                    </div>
-                    {quizScore && (
-                      <div className="text-right">
-                        <p className={`text-lg font-bold ${quizScore.correct / quizScore.total >= 0.7 ? "text-emerald-600" : quizScore.correct / quizScore.total >= 0.4 ? "text-amber-600" : "text-red-500"}`}>
-                          {quizScore.correct}/{quizScore.total}
-                        </p>
-                        <p className="text-[10px] text-slate-400">
-                          {Math.round((quizScore.correct / quizScore.total) * 100)}% score
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Questions list */}
-                  {quizzes.map((q, qIndex) => (
-                    <div
-                      key={qIndex}
-                      className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm"
-                    >
-                      <p className="text-sm font-semibold text-slate-800 mb-3">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold mr-2">
-                          {qIndex + 1}
-                        </span>
-                        {q.question}
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {q.options.map((opt, optIndex) => {
-                          const isSelected = selectedAnswers[q.question] === opt;
-                          const isCorrect =
-                            quizSubmitted && isSelected && opt === q.answer;
-                          const isWrong =
-                            quizSubmitted && isSelected && opt !== q.answer;
-                          const isRevealCorrect =
-                            quizSubmitted && !isSelected && opt === q.answer;
-
-                          return (
-                            <button
-                              key={optIndex}
-                              disabled={quizSubmitted}
-                              onClick={() =>
-                                setSelectedAnswers({
-                                  ...selectedAnswers,
-                                  [q.question]: opt,
-                                })
-                              }
-                              className={`text-left text-sm p-3 rounded-lg border-2 transition ${
-                                isCorrect || isRevealCorrect
-                                  ? "bg-emerald-50 border-emerald-500 text-emerald-800 font-medium"
-                                  : isWrong
-                                  ? "bg-red-50 border-red-400 text-red-800 font-medium"
-                                  : isSelected
-                                  ? "bg-blue-50 border-blue-400 text-blue-800"
-                                  : "bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700"
-                              }`}
-                            >
-                              <span className="font-semibold text-xs mr-2 opacity-60">
-                                {String.fromCharCode(65 + optIndex)}.
-                              </span>
-                              {opt}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Submit / Results */}
-                  <div className="flex items-center gap-4">
-                    {!quizSubmitted ? (
-                      <button
-                        onClick={handleSubmitQuiz}
-                        disabled={!allAnswered}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition"
-                      >
-                        <Send className="h-4 w-4" /> Submit Quiz
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                        <p className="text-sm text-emerald-700 font-medium">
-                          Quiz submitted! Your progress has been updated.
-                        </p>
-                      </div>
-                    )}
-                    {quizSubmitted && (
-                      <button
-                        onClick={() => {
-                          setQuizzes([]);
-                          setSelectedAnswers({});
-                          setQuizSubmitted(false);
-                          setQuizScore(null);
-                        }}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium underline"
-                      >
-                        Take Another Quiz
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
+            <InteractiveQuizView
+              isAdaptiveMode={isAdaptiveQuizMode}
+              setIsAdaptiveMode={setIsAdaptiveQuizMode}
+              quizUnitSelect={quizUnitSelect}
+              setQuizUnitSelect={setQuizUnitSelect}
+              quizNumQuestions={quizNumQuestions}
+              setQuizNumQuestions={setQuizNumQuestions}
+              indexedUnits={indexedUnits}
+              quizLoading={quizLoading}
+              quizError={quizError}
+              onDismissError={() => setQuizError(null)}
+              handleStartQuiz={handleStartQuiz}
+              handleStartAdaptiveQuiz={handleStartAdaptiveQuiz}
+              quizzes={quizzes}
+              selectedAnswers={selectedAnswers}
+              setSelectedAnswers={setSelectedAnswers}
+              quizSubmitted={quizSubmitted}
+              handleSubmitQuiz={handleSubmitQuiz}
+              quizScore={quizScore}
+              onResetQuiz={() => {
+                setQuizzes([]);
+                setSelectedAnswers({});
+                setQuizSubmitted(false);
+                setQuizScore(null);
+              }}
+              adaptiveState={adaptiveState}
+              handleSubmitAdaptiveQuestion={handleSubmitAdaptiveQuestion}
+              handleNextAdaptiveQuestion={handleNextAdaptiveQuestion}
+              isDark={isDark}
+            />
           )}
 
           {/* ═══════════════ AI INSIGHTS TAB ═══════════════ */}
