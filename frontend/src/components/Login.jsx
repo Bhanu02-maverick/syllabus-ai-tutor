@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../api";
-import NaturalBackground from "./NaturalBackground.jsx";
+import StudyBackground from "./StudyBackground.jsx";
 
 export default function Login({ onLogin, initialMode = "login", onBackToLanding }) {
   const [mode, setMode] = useState(initialMode || "login");
@@ -73,8 +73,8 @@ export default function Login({ onLogin, initialMode = "login", onBackToLanding 
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-center p-6 relative font-sans">
-      {/* Clean Natural Background Grid */}
-      <NaturalBackground isDark={false} />
+      {/* Calm background with a soft top glow */}
+      <StudyBackground isDark={false} />
 
       {/* Main Authentication Card */}
       <motion.div
