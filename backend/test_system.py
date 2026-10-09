@@ -6,6 +6,7 @@ Covers authentication, role authorization, guardrail evaluation, and telemetry.
 """
 
 import pytest
+from conftest import requires_google_api_key
 from fastapi.testclient import TestClient
 from main import app
 import time
@@ -89,6 +90,7 @@ def test_quiz_submit_and_progress(student_token):
     assert res.status_code == 200
     assert res.json()["saved"] == 1
 
+@requires_google_api_key
 def test_out_of_syllabus_guardrail(student_token):
     """
     Out-of-syllabus query must trigger the similarity-threshold guardrail
@@ -109,6 +111,7 @@ def test_out_of_syllabus_guardrail(student_token):
     assert data["top_similarity"] is not None
     assert data["top_similarity"] < 0.40
 
+@requires_google_api_key
 def test_doubt_history_auditing(student_token):
     """Doubt history records every attempt with top_similarity audit score."""
     tok, fid = student_token
