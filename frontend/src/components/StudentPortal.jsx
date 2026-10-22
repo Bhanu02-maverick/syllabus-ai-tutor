@@ -51,7 +51,7 @@ import RevisionNotesView from "./RevisionNotesView.jsx";
 import InteractiveQuizView from "./InteractiveQuizView.jsx";
 import TimedMockExamView from "./TimedMockExamView.jsx";
 import NetworkCanvas from "./NetworkCanvas.jsx";
-import WorkspaceHero from "./WorkspaceHero.jsx";
+import StudentDashboard from "./StudentDashboard.jsx";
 import GamificationConstellation from "./GamificationConstellation.jsx";
 import RAGNodeVisualizer from "./RAGNodeVisualizer.jsx";
 
@@ -206,14 +206,14 @@ export default function StudentPortal({ user, onLogout }) {
   // ─── Browser History & Routing Synchronization ────────────────────────
   const getInitialTab = () => {
     const hash = window.location.hash.replace("#", "").toLowerCase();
-    const validTabs = ["study", "qa", "mindmap", "notes", "revision", "quiz", "mock_exam", "mock", "insights", "history"];
+    const validTabs = ["dashboard", "study", "qa", "mindmap", "notes", "revision", "quiz", "mock_exam", "mock", "insights", "history"];
     if (validTabs.includes(hash)) {
       if (hash === "qa") return "study";
       if (hash === "revision") return "notes";
       if (hash === "mock") return "mock_exam";
       return hash;
     }
-    return "study";
+    return "dashboard";
   };
 
   const [activeTab, setActiveTabState] = useState(getInitialTab);
@@ -249,13 +249,13 @@ export default function StudentPortal({ user, onLogout }) {
     const handlePopState = (event) => {
       const stateTab = event.state?.tab;
       const hashTab = window.location.hash.replace("#", "").toLowerCase();
-      let targetTab = stateTab || hashTab || "study";
+      let targetTab = stateTab || hashTab || "dashboard";
 
       if (targetTab === "qa") targetTab = "study";
       if (targetTab === "revision") targetTab = "notes";
       if (targetTab === "mock") targetTab = "mock_exam";
 
-      const validTabs = ["study", "mindmap", "notes", "quiz", "mock_exam", "insights", "history"];
+      const validTabs = ["dashboard", "study", "mindmap", "notes", "quiz", "mock_exam", "insights", "history"];
       if (validTabs.includes(targetTab)) {
         setActiveTabState(targetTab);
       }
@@ -316,7 +316,24 @@ export default function StudentPortal({ user, onLogout }) {
 
   // Gamification state
   const [gamification, setGamification] = useState(null);
-  const [showHero, setShowHero] = useState(true);
+  const [showGuide, setShowGuide] = useState(() => {
+    try {
+      return localStorage.getItem("vce_hide_guide") !== "1";
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleGuide = () => {
+    setShowGuide((prev) => {
+      try {
+        localStorage.setItem("vce_hide_guide", prev ? "1" : "0");
+      } catch {
+        /* storage unavailable — keep in-memory state only */
+      }
+      return !prev;
+    });
+  };
 
 
   // Topic filter state for Q&A
@@ -982,16 +999,18 @@ export default function StudentPortal({ user, onLogout }) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowHero(!showHero)}
+            onClick={() => {
+              setActiveTab("dashboard");
+              if (!showGuide) toggleGuide();
+            }}
+            title="Show the step-by-step student guide"
             className={`vce-btn vce-btn-sm ${
-              showHero
-                ? "bg-primary-600 text-white border-primary-500 shadow-sm"
-                : isDark
+              isDark
                 ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
                 : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
             }`}
           >
-            <Sparkles className="h-3.5 w-3.5" /> Hero
+            <HelpCircle className="h-3.5 w-3.5" /> How it works
           </button>
 
           {/* Light / Dark Mode Toggle */}
@@ -1010,27 +1029,85 @@ export default function StudentPortal({ user, onLogout }) {
         </div>
       </header>
 
-      {/* Opening Cinematic Hero Entrance */}
-      <AnimatePresence>
-        {showHero && (
-          <div className="p-6 max-w-7xl mx-auto w-full z-10">
-            <WorkspaceHero onEnterWorkspace={() => setShowHero(false)} isDark={isDark} />
-          </div>
-        )}
-      </AnimatePresence>
-
-      <div className={`flex-1 max-w-8xl w-full mx-auto px-4 lg:px-6 py-5 flex flex-col md:flex-row gap-5 z-10 ${showHero ? "hidden" : ""}`}>
+      <div className="flex-1 max-w-8xl w-full mx-auto px-4 lg:px-6 py-5 flex flex-col md:flex-row gap-5 z-10">
         {/* ─── Left Sidebar Navigation ─── */}
         <aside className={`vce-sidebar ${
           isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""
         }`}>
-          {/* Section 1: Syllabus Units */}
+          {/* Section 1: Grouped Navigation */}
+          {[
+            {
+              group: "Learn",
+              tabs: [
+                { id: "dashboard", icon: Layers, label: "Dashboard", hint: "Your progress at a glance" },
+                { id: "study", icon: Brain, label: "Ask a Doubt", hint: "Answers only from your syllabus notes" },
+                { id: "mindmap", icon: Network, label: "Mind Maps", hint: "See how topics in a unit connect" },
+                { id: "notes", icon: BookMarked, label: "Revision Notes", hint: "Short notes for quick revision" },
+                { id: "quiz", icon: ClipboardList, label: "Quizzes", hint: "Practise and track your mastery" },
+                { id: "mock_exam", icon: Clock, label: "Mock Exams", hint: "Timed exam across several units" },
+              ],
+            },
+            {
+              group: "Progress",
+              tabs: [
+                { id: "insights", icon: Target, label: "Weak Topics & Plan", hint: "What to study next, and a study plan" },
+                { id: "history", icon: History, label: "My Questions", hint: "Every doubt you've asked so far" },
+              ],
+            },
+          ].map(({ group, tabs }) => (
+            <div key={group}>
+              <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
+                isDark ? "text-slate-500" : "text-slate-400"
+              }`}>
+                {group}
+              </h2>
+              <div className="space-y-0.5">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      title={tab.hint}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition relative cursor-pointer ${
+                        isActive
+                          ? isDark
+                            ? "text-white font-semibold"
+                            : "text-primary-700 font-semibold"
+                          : isDark
+                          ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeSidebarTabPill"
+                          className={`absolute inset-0 rounded-xl ${
+                            isDark ? "bg-primary-500/10 border border-primary-500/20" : "bg-primary-50 border border-primary-100"
+                          }`}
+                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                        />
+                      )}
+                      <Icon className={`w-4 h-4 z-10 transition-colors ${isActive ? (isDark ? "text-primary-400" : "text-primary-600") : ""}`} />
+                      <span className="z-10">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Section 2: Syllabus Units */}
           <div>
             <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
               isDark ? "text-slate-500" : "text-slate-400"
             }`}>
-              Syllabus Units
+              Your Units
             </h2>
+            <p className={`text-[11px] -mt-1.5 mb-2 px-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+              Click a unit to see its topics.
+            </p>
             <div className="space-y-1 max-h-56 overflow-y-auto pr-1 no-scrollbar">
               {units.length === 0 && (
                 <p className="text-xs opacity-50 italic">No units uploaded yet.</p>
@@ -1139,56 +1216,6 @@ export default function StudentPortal({ user, onLogout }) {
             </div>
           </div>
 
-          {/* Section 2: Sidebar Navigation Tabs */}
-          <div>
-            <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
-              isDark ? "text-slate-500" : "text-slate-400"
-            }`}>
-              Navigation
-            </h2>
-            <div className="space-y-0.5">
-              {[
-                { id: "study", icon: Brain, label: "Study & Ask" },
-                { id: "mindmap", icon: Network, label: "Mind Maps" },
-                { id: "notes", icon: BookMarked, label: "Revision Notes" },
-                { id: "quiz", icon: ClipboardList, label: "Take Quiz" },
-                { id: "mock_exam", icon: Clock, label: "Mock Exam" },
-                { id: "insights", icon: Target, label: "AI Insights" },
-                { id: "history", icon: History, label: "Doubt History" },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition relative cursor-pointer ${
-                      isActive
-                        ? isDark
-                          ? "text-white font-semibold"
-                          : "text-primary-700 font-semibold"
-                        : isDark
-                        ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                    }`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeSidebarTabPill"
-                        className={`absolute inset-0 rounded-xl ${
-                          isDark ? "bg-primary-500/10 border border-primary-500/20" : "bg-primary-50 border border-primary-100"
-                        }`}
-                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      />
-                    )}
-                    <Icon className={`w-4 h-4 z-10 transition-colors ${isActive ? (isDark ? "text-primary-400" : "text-primary-600") : ""}`} />
-                    <span className="z-10">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Section 3: Compact Progress Pill */}
           <div className={`vce-divider ${isDark ? "!bg-slate-800" : ""}`} />
           <div className={`p-3.5 rounded-xl border space-y-2 transition ${
@@ -1220,10 +1247,53 @@ export default function StudentPortal({ user, onLogout }) {
         {/* ─── Right Main Workspace (Focused Active View) ─── */}
         <main className="flex-1 min-w-0 space-y-6">
 
+          {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
+          {activeTab === "dashboard" && (
+            <StudentDashboard
+              user={user}
+              units={safeUnits}
+              gamification={gamification}
+              facultyId={selectedFacultyId}
+              subjectName={facultyList.find((f) => f.id === selectedFacultyId)?.subject_name}
+              isDark={isDark}
+              showGuide={showGuide}
+              onToggleGuide={toggleGuide}
+              onNavigate={setActiveTab}
+              onStudyUnit={(unitNumber) => {
+                setActiveTab("study");
+                setQaUnitSelect(String(unitNumber));
+                setQaSubtopicSelect("");
+              }}
+              onQuizUnit={handleFullUnitQuiz}
+            />
+          )}
+
           {/* ═══════════════ STUDY TAB ═══════════════ */}
           {activeTab === "study" && (
             <>
               <div className={`vce-card p-5 ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}>
+                {/* Page header: what this page does, in plain words */}
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2 rounded-xl bg-primary-500/10 text-primary-500 border border-primary-500/20">
+                    <Brain className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {(() => {
+                          const u = units.find((x) => String(x.unit_number) === String(qaUnitSelect));
+                          return u ? `Unit ${u.unit_number} — ${u.unit_name}` : "Ask a Doubt";
+                        })()}
+                      </h2>
+                      <span className="vce-badge-success text-[10px]">
+                        <CheckCircle2 className="h-3 w-3" /> Syllabus-bound
+                      </span>
+                    </div>
+                    <p className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                      Ask anything from your syllabus. Answers come only from your faculty's notes, with the page they came from.
+                    </p>
+                  </div>
+                </div>
                 <form onSubmit={handleAsk} className="space-y-4">
                   {/* Topic Filter Selector */}
                   <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl border ${
@@ -1233,7 +1303,7 @@ export default function StudentPortal({ user, onLogout }) {
                       <label className={`block text-xs font-medium mb-1.5 ${
                         isDark ? "text-slate-400" : "text-slate-500"
                       }`}>
-                        Target Unit
+                        Unit
                       </label>
                       <select
                         value={qaUnitSelect}
@@ -1245,7 +1315,7 @@ export default function StudentPortal({ user, onLogout }) {
                           isDark ? "bg-surface-dark border-slate-700 text-white" : ""
                         }`}
                       >
-                        <option value="">All Syllabus Units</option>
+                        <option value="">All units</option>
                         {units.map((u) => (
                           <option key={u.unit_number} value={u.unit_number}>
                             Unit {u.unit_number}: {u.unit_name}
@@ -1258,13 +1328,13 @@ export default function StudentPortal({ user, onLogout }) {
                       <label className={`block text-xs font-medium mb-1.5 ${
                         isDark ? "text-slate-400" : "text-slate-500"
                       }`}>
-                        Specific Subtopic
+                        Topic <span className="opacity-60">(optional)</span>
                       </label>
                       <input
                         type="text"
                         value={qaSubtopicSelect}
                         onChange={(e) => setQaSubtopicSelect(e.target.value)}
-                        placeholder="e.g. Stemming, CPU Scheduling..."
+                        placeholder="e.g. Stemming"
                         className={`vce-input text-xs ${
                           isDark ? "bg-surface-dark border-slate-700 text-white placeholder-slate-500" : ""
                         }`}
@@ -1276,21 +1346,54 @@ export default function StudentPortal({ user, onLogout }) {
                     <label className={`block text-sm font-semibold mb-1.5 ${
                       isDark ? "text-slate-200" : "text-slate-700"
                     }`}>
-                      Ask a Question
+                      Your question
                     </label>
                     <input
                       type="text"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="e.g., Define Round Robin CPU Scheduling and its time quantum..."
+                      placeholder="Type your doubt, e.g. What is stemming? Give an example."
                       className={`vce-input ${
                         isDark ? "bg-surface-dark border-slate-700 text-white placeholder-slate-500" : ""
                       }`}
                     />
                   </div>
 
+                  {/* Starter questions — help students who don't know what to ask */}
+                  {!query && !result && (() => {
+                    const u = units.find((x) => String(x.unit_number) === String(qaUnitSelect));
+                    const topic = qaSubtopicSelect || (subtopicsCache[qaUnitSelect] || [])[0];
+                    const starters = u
+                      ? [
+                          `Explain the main ideas of ${u.unit_name} in simple words`,
+                          topic ? `What is ${topic}? Give an example.` : `What are the key topics in Unit ${u.unit_number}?`,
+                          `List the most important exam questions from Unit ${u.unit_number}`,
+                        ]
+                      : ["What are the key topics in this course?", "Explain the first unit in simple words"];
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-[11px] font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>Try:</span>
+                        {starters.map((q) => (
+                          <button
+                            key={q}
+                            type="button"
+                            onClick={() => setQuery(q)}
+                            className={`text-[11px] px-2.5 py-1 rounded-full border transition cursor-pointer ${
+                              isDark
+                                ? "border-slate-700 text-slate-300 hover:border-primary-500/50 hover:text-white"
+                                : "border-slate-200 text-slate-600 hover:border-primary-300 hover:text-primary-700"
+                            }`}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className={`flex items-center p-0.5 rounded-lg border text-xs font-medium ${
+                    <div className="flex flex-col gap-1">
+                    <div className={`flex items-center p-0.5 rounded-lg border text-xs font-medium self-start ${
                       isDark ? "bg-slate-900 border-slate-800" : "bg-surface-tertiary border-slate-200"
                     }`}>
                       <button
@@ -1324,13 +1427,19 @@ export default function StudentPortal({ user, onLogout }) {
                         Analogy Mode
                       </button>
                     </div>
+                    <p className={`text-[11px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                      {mode === "exam"
+                        ? "Exam Mode: structured answer, written the way you'd answer in an exam."
+                        : "Analogy Mode: explained with everyday examples — best when a topic feels confusing."}
+                    </p>
+                    </div>
                     <button
                       type="submit"
                       disabled={loading}
                       className="vce-btn-primary vce-btn-sm"
                     >
                       {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      {loading ? "Searching..." : "Ask Syllabus AI"}
+                      {loading ? "Searching your notes..." : "Ask AI Tutor"}
                     </button>
                   </div>
                 </form>
@@ -1350,7 +1459,7 @@ export default function StudentPortal({ user, onLogout }) {
                         <span className={`text-xs font-semibold uppercase tracking-wider ${
                           isDark ? "text-slate-400" : "text-slate-500"
                         }`}>
-                          {mode === "analogy" ? "Analogy Explanation" : "Verified Answer"}
+                          {mode === "analogy" ? "Explained with an analogy" : "Answer from your syllabus"}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -1385,7 +1494,7 @@ export default function StudentPortal({ user, onLogout }) {
                       }`}>
                         <span className={`text-[11px] font-medium ${
                           isDark ? "text-slate-500" : "text-slate-400"
-                        }`}>Re-explain:</span>
+                        }`}>Still unclear?</span>
                         <button
                           onClick={() => handleExplainAgain("simpler")}
                           disabled={explainLoading}
@@ -1396,7 +1505,7 @@ export default function StudentPortal({ user, onLogout }) {
                           } disabled:opacity-50`}
                         >
                           {explainLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                          Simpler
+                          Explain simpler
                         </button>
                         <button
                           onClick={() => handleExplainAgain("detailed")}
@@ -1421,7 +1530,7 @@ export default function StudentPortal({ user, onLogout }) {
                         <p className={`text-[11px] ${
                           isDark ? "text-slate-500" : "text-slate-400"
                         }`}>
-                          Sourced from Unit {result.unit_number} · Syllabus-verified response
+                          Taken from Unit {result.unit_number} of your course notes. Green tags above show the exact page.
                         </p>
                       </div>
                     )}
