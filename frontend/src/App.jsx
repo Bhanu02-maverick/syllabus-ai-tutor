@@ -64,7 +64,16 @@ class ErrorBoundary extends Component {
 }
 
 export default function App() {
-  const [user, setUser] = useState(null);
+  // Restore the session on refresh: the token and user are saved at login. If the token has
+  // expired, the first API call returns 401 and the vce_unauthorized handler below signs out.
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("vce_user");
+      return saved && localStorage.getItem("vce_token") ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [authMode, setAuthMode] = useState(null); // null = LandingPage, "login" | "signup"
 
   React.useEffect(() => {
@@ -89,6 +98,8 @@ export default function App() {
     api.setToken(null);
     setUser(null);
     setAuthMode(null);
+    // Drop the portal tab from the URL so the next person doesn't land mid-session
+    window.history.replaceState(null, "", window.location.pathname);
   };
 
   const renderContent = () => {

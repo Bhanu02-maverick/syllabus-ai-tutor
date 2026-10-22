@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   Loader2,
   ClipboardList,
-  Sparkles,
   Award,
   Brain,
   Target,
@@ -33,6 +32,7 @@ import {
   Copy,
   Check,
   RotateCcw,
+  Lightbulb,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -43,17 +43,12 @@ import rehypeRaw from "rehype-raw";
 import { preprocessLaTeX } from "../utils/latexHelper.js";
 import { api } from "../api";
 import ThemeToggle from "./ThemeToggle.jsx";
-import GamificationCard from "./GamificationCard.jsx";
-import AIThinking from "./AIThinking.jsx";
 import NodeActionPanel from "./NodeActionPanel.jsx";
 import MindMapVisualizer from "./MindMapVisualizer.jsx";
 import RevisionNotesView from "./RevisionNotesView.jsx";
 import InteractiveQuizView from "./InteractiveQuizView.jsx";
 import TimedMockExamView from "./TimedMockExamView.jsx";
-import NetworkCanvas from "./NetworkCanvas.jsx";
 import StudentDashboard from "./StudentDashboard.jsx";
-import GamificationConstellation from "./GamificationConstellation.jsx";
-import RAGNodeVisualizer from "./RAGNodeVisualizer.jsx";
 
 
 
@@ -137,32 +132,32 @@ function RenderMindMapNode({ node, onAction }) {
       <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs hover:shadow-md transition">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-            <Sparkles className="h-4 w-4 text-indigo-500" /> {node.label}
+            <Lightbulb className="h-4 w-4 text-indigo-500" /> {node.label}
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => onAction(node.id, node.label, "explain")}
               className="text-[11px] font-semibold px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md border border-blue-200 transition cursor-pointer"
             >
-              💡 Explain
+              Explain
             </button>
             <button
               onClick={() => onAction(node.id, node.label, "example")}
               className="text-[11px] font-semibold px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-md border border-amber-200 transition cursor-pointer"
             >
-              🔍 Example
+              Example
             </button>
             <button
               onClick={() => onAction(node.id, node.label, "quiz")}
               className="text-[11px] font-semibold px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md border border-emerald-200 transition cursor-pointer"
             >
-              🎯 Quiz Me
+              Quiz me
             </button>
             <button
               onClick={() => onAction(node.id, node.label, "ask")}
               className="text-[11px] font-semibold px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md border border-purple-200 transition cursor-pointer"
             >
-              💬 Ask AI
+              Ask
             </button>
           </div>
         </div>
@@ -226,6 +221,7 @@ export default function StudentPortal({ user, onLogout }) {
     if (target === "mock") target = "mock_exam";
 
     setActiveTabState(target);
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
     if (pushState && window.history) {
       const currentHash = window.location.hash.replace("#", "").toLowerCase();
@@ -234,6 +230,24 @@ export default function StudentPortal({ user, onLogout }) {
       }
     }
   }, []);
+
+  // Browser tab title follows the current page
+  useEffect(() => {
+    const titles = {
+      dashboard: "Dashboard",
+      study: "Ask a Doubt",
+      mindmap: "Mind Maps",
+      notes: "Revision Notes",
+      quiz: "Quizzes",
+      mock_exam: "Mock Exams",
+      insights: "Weak Topics & Plan",
+      history: "My Questions",
+    };
+    document.title = `${titles[activeTab] || "Student"} · VCE AI Tutor`;
+    return () => {
+      document.title = "VCE AI Tutor";
+    };
+  }, [activeTab]);
 
   // Listen to browser Back / Forward buttons (popstate event)
   useEffect(() => {
@@ -277,6 +291,7 @@ export default function StudentPortal({ user, onLogout }) {
   const [result, setResult] = useState(null);
   const [lastQuery, setLastQuery] = useState(""); // for explain-again
   const [explainLoading, setExplainLoading] = useState(false);
+  const [copiedAnswer, setCopiedAnswer] = useState(false);
 
   // Quiz tab state
   const [quizUnitSelect, setQuizUnitSelect] = useState("");
@@ -444,12 +459,12 @@ export default function StudentPortal({ user, onLogout }) {
   }, [selectedFacultyId, loadProgress, loadGamification]);
 
   // ─── Mind Map Handler ───
-  const handleLoadMindMap = async (unitNum) => {
+  const handleLoadMindMap = async (unitNum, refresh = false) => {
     const targetUnit = unitNum || mindMapUnit;
     if (!selectedFacultyId || !targetUnit) return;
     setMindMapLoading(true);
     try {
-      const data = await api.getMindMap(Number(targetUnit), selectedFacultyId);
+      const data = await api.getMindMap(Number(targetUnit), selectedFacultyId, refresh);
       setMindMapData(data);
     } catch (err) {
       alert(err.message || "Could not generate Mind Map.");
@@ -462,10 +477,10 @@ export default function StudentPortal({ user, onLogout }) {
     setNodeModal((prev) => ({ ...prev, loading: true }));
     try {
       const promptText = `Regarding the syllabus concept '${nodeLabel}': ${userQuestion}`;
-      const res = await api.askQuestion(Number(mindMapUnit || 1), promptText, selectedFacultyId);
+      const res = await api.ask(promptText, "exam", selectedFacultyId, Number(mindMapUnit) || null);
       setNodeModal((prev) => ({
         ...prev,
-        content: prev.content + `\n\n---\n**Q:** ${userQuestion}\n\n**AI Answer:** ${res.answer}`,
+        content: prev.content + `\n\n---\n**Q:** ${userQuestion}\n\n${res.answer}`,
         loading: false,
       }));
     } catch (err) {
@@ -483,7 +498,7 @@ export default function StudentPortal({ user, onLogout }) {
         isOpen: true,
         nodeLabel,
         action: "ask",
-        content: `### 💬 Ask Syllabus AI about **${nodeLabel}**\n\nI can explain concepts, provide real-world examples, or break down formulas for **${nodeLabel}**. Ask your question below:`,
+        content: `### Ask about **${nodeLabel}**\n\nI can explain concepts, provide real-world examples, or break down formulas for **${nodeLabel}**. Ask your question below:`,
         loading: false,
       });
       return;
@@ -499,12 +514,12 @@ export default function StudentPortal({ user, onLogout }) {
   };
 
   // ─── Revision Notes Handler ───
-  const handleLoadNotes = async (unitNum) => {
+  const handleLoadNotes = async (unitNum, refresh = false) => {
     const targetUnit = unitNum || notesUnit;
     if (!selectedFacultyId || !targetUnit) return;
     setNotesLoading(true);
     try {
-      const data = await api.getRevisionNotes(Number(targetUnit), selectedFacultyId);
+      const data = await api.getRevisionNotes(Number(targetUnit), selectedFacultyId, refresh);
       setRevisionNotesData(data);
     } catch (err) {
       alert(err.message || "Could not load revision notes.");
@@ -690,7 +705,7 @@ export default function StudentPortal({ user, onLogout }) {
     } catch (err) {
       console.error(err);
       setResult({
-        answer: `⚠️ **Notice**: ${err.message || "Failed to query syllabus. Please make sure PDFs are uploaded for this course."}`,
+        answer: `**Notice**: ${err.message || "Failed to query syllabus. Please make sure PDFs are uploaded for this course."}`,
         citations: [],
         unit_number: null,
       });
@@ -844,7 +859,7 @@ export default function StudentPortal({ user, onLogout }) {
     } catch (err) {
       setNodeModal((prev) => ({
         ...prev,
-        content: `⚠️ Failed to fetch explanation: ${err.message}`,
+        content: `Failed to fetch explanation: ${err.message}`,
         loading: false,
       }));
     }
@@ -886,7 +901,7 @@ export default function StudentPortal({ user, onLogout }) {
       const data = await api.getUnitSummary(unitNumber, selectedFacultyId);
       setUnitSummary(data);
     } catch (err) {
-      setUnitSummary({ summary: `⚠️ ${err.message || "Could not generate summary."}`, unit_name: "", unit_number: unitNumber });
+      setUnitSummary({ summary: `${err.message || "Could not generate summary."}`, unit_name: "", unit_number: unitNumber });
     } finally {
       setSummaryLoading(false);
     }
@@ -919,8 +934,15 @@ export default function StudentPortal({ user, onLogout }) {
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
       isDark ? "dark bg-surface-dark text-slate-100" : "bg-surface-secondary text-slate-800"
     }`}>
-      {/* 60 FPS HTML5 Canvas Background Particle Network */}
-      <NetworkCanvas isDark={isDark} />
+      {/* Soft static backdrop: a faint top glow instead of the animated particle network */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 top-0 h-[420px] ${
+          isDark
+            ? "bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.12),transparent_65%)]"
+            : "bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_65%)]"
+        }`}
+      />
 
       {/* Header */}
       <header className={`sticky top-0 px-4 lg:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b transition-colors z-30 ${
@@ -1031,7 +1053,7 @@ export default function StudentPortal({ user, onLogout }) {
 
       <div className="flex-1 max-w-8xl w-full mx-auto px-4 lg:px-6 py-5 flex flex-col md:flex-row gap-5 z-10">
         {/* ─── Left Sidebar Navigation ─── */}
-        <aside className={`vce-sidebar ${
+        <aside className={`vce-sidebar max-md:!flex max-md:!flex-row max-md:gap-1 max-md:overflow-x-auto max-md:no-scrollbar max-md:!p-2 max-md:!space-y-0 ${
           isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""
         }`}>
           {/* Section 1: Grouped Navigation */}
@@ -1055,13 +1077,13 @@ export default function StudentPortal({ user, onLogout }) {
               ],
             },
           ].map(({ group, tabs }) => (
-            <div key={group}>
-              <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
+            <div key={group} className="contents md:block">
+              <h2 className={`hidden md:block text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
                 isDark ? "text-slate-500" : "text-slate-400"
               }`}>
                 {group}
               </h2>
-              <div className="space-y-0.5">
+              <div className="contents md:block md:space-y-0.5">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -1070,7 +1092,7 @@ export default function StudentPortal({ user, onLogout }) {
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       title={tab.hint}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition relative cursor-pointer ${
+                      className={`flex-shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium whitespace-nowrap transition relative cursor-pointer ${
                         isActive
                           ? isDark
                             ? "text-white font-semibold"
@@ -1099,7 +1121,7 @@ export default function StudentPortal({ user, onLogout }) {
           ))}
 
           {/* Section 2: Syllabus Units */}
-          <div>
+          <div className="hidden md:block">
             <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
               isDark ? "text-slate-500" : "text-slate-400"
             }`}>
@@ -1217,8 +1239,8 @@ export default function StudentPortal({ user, onLogout }) {
           </div>
 
           {/* Section 3: Compact Progress Pill */}
-          <div className={`vce-divider ${isDark ? "!bg-slate-800" : ""}`} />
-          <div className={`p-3.5 rounded-xl border space-y-2 transition ${
+          <div className={`hidden md:block vce-divider ${isDark ? "!bg-slate-800" : ""}`} />
+          <div className={`hidden md:block p-3.5 rounded-xl border space-y-2 transition ${
             isDark ? "bg-slate-900/60 border-slate-800" : "bg-surface-tertiary border-slate-100"
           }`}>
             <div className="flex items-center justify-between text-xs">
@@ -1245,7 +1267,14 @@ export default function StudentPortal({ user, onLogout }) {
         </aside>
 
         {/* ─── Right Main Workspace (Focused Active View) ─── */}
-        <main className="flex-1 min-w-0 space-y-6">
+        <main className="flex-1 min-w-0">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-6"
+          >
 
           {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
           {activeTab === "dashboard" && (
@@ -1445,9 +1474,46 @@ export default function StudentPortal({ user, onLogout }) {
                 </form>
               </div>
 
+              {/* Thinking state while the tutor reads the notes */}
+              {loading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`vce-card p-5 space-y-3 ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}
+                >
+                  <div className={`flex items-center gap-2 text-xs font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <span className="flex gap-1">
+                      {[0, 1, 2].map((d) => (
+                        <motion.span
+                          key={d}
+                          animate={{ y: [0, -4, 0] }}
+                          transition={{ duration: 0.6, repeat: Infinity, delay: d * 0.15 }}
+                          className="w-1.5 h-1.5 rounded-full bg-primary-500"
+                        />
+                      ))}
+                    </span>
+                    Reading your course notes…
+                  </div>
+                  {[92, 78, 85, 60].map((w, i) => (
+                    <div key={i} className={`h-3 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-100"}`} style={{ width: `${w}%` }}>
+                      <motion.div
+                        className={`h-full w-1/3 ${isDark ? "bg-slate-700" : "bg-slate-200"}`}
+                        animate={{ x: ["-100%", "300%"] }}
+                        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
+                      />
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+
               {/* Answer Card */}
-              {result && (
-                <div className={`vce-card overflow-hidden ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}>
+              {result && !loading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className={`vce-card overflow-hidden ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}
+                >
                   {/* Gradient accent bar */}
                   <div className="h-0.5 bg-gradient-to-r from-primary-500 via-accent-500 to-success-500" />
 
@@ -1455,25 +1521,28 @@ export default function StudentPortal({ user, onLogout }) {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Sparkles className={`h-4 w-4 ${isDark ? "text-primary-400" : "text-primary-500"}`} />
+                        <BookOpen className={`h-4 w-4 ${isDark ? "text-primary-400" : "text-primary-500"}`} />
                         <span className={`text-xs font-semibold uppercase tracking-wider ${
                           isDark ? "text-slate-400" : "text-slate-500"
                         }`}>
                           {mode === "analogy" ? "Explained with an analogy" : "Answer from your syllabus"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {result.citations.map((c, i) => (
-                          <span
-                            key={i}
-                            className={`vce-badge-success text-[10px] ${
-                              isDark ? "" : ""
-                            }`}
-                          >
-                            <FileText className="h-3 w-3" /> Page {c.page} · {c.source}
-                          </span>
-                        ))}
-                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard?.writeText(result.answer).then(() => {
+                            setCopiedAnswer(true);
+                            setTimeout(() => setCopiedAnswer(false), 1500);
+                          });
+                        }}
+                        title="Copy answer"
+                        className={`vce-btn vce-btn-sm ${
+                          isDark ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {copiedAnswer ? <Check className="h-3.5 w-3.5 text-success-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copiedAnswer ? "Copied" : "Copy"}
+                      </button>
                     </div>
 
                     {/* Markdown-rendered content with Formatted Math LaTeX */}
@@ -1522,25 +1591,41 @@ export default function StudentPortal({ user, onLogout }) {
                       </div>
                     )}
 
-                    {/* Source info footer */}
-                    {result.unit_number && (
-                      <div className={`pt-3 border-t ${
-                        isDark ? "border-slate-800" : "border-slate-100"
-                      }`}>
-                        <p className={`text-[11px] ${
-                          isDark ? "text-slate-500" : "text-slate-400"
-                        }`}>
-                          Taken from Unit {result.unit_number} of your course notes. Green tags above show the exact page.
+                    {/* Sources: the exact passages the answer was built from */}
+                    {result.citations?.length > 0 && (
+                      <div className={`pt-4 border-t ${isDark ? "border-slate-800" : "border-slate-100"}`}>
+                        <p className={`text-xs font-semibold mb-2.5 flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                          <FileText className="h-3.5 w-3.5 text-success-500" /> Sources from your notes
                         </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {result.citations.map((c, i) => (
+                            <motion.div
+                              key={`${c.source}-${c.page}`}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.15 + i * 0.07 }}
+                              className={`p-3 rounded-xl border text-left ${
+                                isDark ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className={`text-[11px] font-semibold truncate ${isDark ? "text-slate-300" : "text-slate-700"}`} title={c.source}>
+                                  {c.source.replace(/\.pdf$/i, "")}
+                                </span>
+                                <span className="vce-badge-success text-[10px] flex-shrink-0">Page {c.page}</span>
+                              </div>
+                              {c.snippet && (
+                                <p className={`text-[11px] leading-relaxed line-clamp-3 ${isDark ? "text-slate-500" : "text-slate-500"}`}>
+                                  "{c.snippet}"
+                                </p>
+                              )}
+                            </motion.div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* Interactive RAG Vector Neural Flow Graph Visualizer */}
-              {result && (
-                <RAGNodeVisualizer citations={result.citations || []} query={query} isDark={isDark} />
+                </motion.div>
               )}
             </>
           )}
@@ -1559,10 +1644,10 @@ export default function StudentPortal({ user, onLogout }) {
                   </div>
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                      Interactive AI Mind Map
+                      Mind Map
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Visual syllabus knowledge tree. Click concept nodes for deep explanations, real-world examples, or micro-quizzes.
+                      Every topic in the unit and how they connect, built from your course notes. Click a topic to explain it, see an example or quiz yourself.
                     </p>
                   </div>
                 </div>
@@ -1582,12 +1667,13 @@ export default function StudentPortal({ user, onLogout }) {
                     ))}
                   </select>
                   <button
-                    onClick={() => handleLoadMindMap(mindMapUnit)}
+                    onClick={() => handleLoadMindMap(mindMapUnit, !!mindMapData)}
                     disabled={mindMapLoading}
+                    title={mindMapData ? "Rebuild this mind map from the latest notes" : undefined}
                     className="vce-btn vce-btn-primary vce-btn-sm"
                   >
                     {mindMapLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    {mindMapLoading ? "Generating..." : "Generate Mind Map"}
+                    {mindMapLoading ? "Reading notes..." : mindMapData ? "Regenerate" : "Generate Mind Map"}
                   </button>
                 </div>
               </div>
@@ -1602,7 +1688,7 @@ export default function StudentPortal({ user, onLogout }) {
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                    Structuring syllabus topics into interactive tree...
+                    Reading the whole unit and mapping its topics...
                   </p>
                   <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto overflow-hidden">
                     <div className="h-full bg-primary-600 rounded-full animate-pulse" style={{ width: "70%" }} />
@@ -1659,10 +1745,10 @@ export default function StudentPortal({ user, onLogout }) {
                   </div>
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                      AI Syllabus Revision Notes
+                      Revision Notes
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      High-yield exam points, key definitions, formulas, and expected questions generated from PDF context.
+                      A section-by-section summary of your course notes, with page numbers, key definitions and likely exam questions.
                     </p>
                   </div>
                 </div>
@@ -1682,12 +1768,13 @@ export default function StudentPortal({ user, onLogout }) {
                     ))}
                   </select>
                   <button
-                    onClick={() => handleLoadNotes(notesUnit)}
+                    onClick={() => handleLoadNotes(notesUnit, !!revisionNotesData)}
                     disabled={notesLoading}
+                    title={revisionNotesData ? "Rewrite these notes from the latest course material" : undefined}
                     className="vce-btn vce-btn-primary vce-btn-sm"
                   >
-                    {notesLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    {notesLoading ? "Generating..." : "Generate Notes"}
+                    {notesLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                    {notesLoading ? "Reading notes..." : revisionNotesData ? "Regenerate" : "Generate Notes"}
                   </button>
                 </div>
               </div>
@@ -1931,7 +2018,7 @@ export default function StudentPortal({ user, onLogout }) {
                   </div>
 
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
-                    💡 <strong>AI Feedback:</strong> {mockExamReport.ai_feedback}
+                    <strong>Tutor feedback:</strong> {mockExamReport.ai_feedback}
                   </div>
 
                   <div className="space-y-3">
@@ -2007,11 +2094,11 @@ export default function StudentPortal({ user, onLogout }) {
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
                     <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-indigo-400 animate-pulse" />
-                      AI Learner Intelligence Dashboard
+                      <Target className="h-5 w-5 text-indigo-400" />
+                      Weak Topics & Study Plan
                     </h2>
                     <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                      Real-time topic mastery, weak-topic detection, and evidence-grounded study planner
+                      Worked out from your quiz answers: what you know well, what needs work, and what to study next
                     </p>
                   </div>
                   <button
@@ -2020,7 +2107,7 @@ export default function StudentPortal({ user, onLogout }) {
                     className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/80 px-3.5 py-2 rounded-xl border border-indigo-800 transition disabled:opacity-50"
                   >
                     {insightsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    {insightsLoading ? "Analyzing..." : "Refresh Intelligence"}
+                    {insightsLoading ? "Updating..." : "Refresh"}
                   </button>
                 </div>
 
@@ -2092,7 +2179,7 @@ export default function StudentPortal({ user, onLogout }) {
 
                     <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-purple-950/30 border-purple-900/50" : "bg-purple-50 border-purple-100"}`}>
                       <span className="text-2xl font-extrabold text-purple-400">{insightsData.overview.xp} <span className="text-xs text-purple-300">XP</span></span>
-                      <span className="text-[11px] font-semibold text-purple-400/80 uppercase tracking-wider mt-1">🔥 {insightsData.overview.streak_days} Day Streak</span>
+                      <span className="text-[11px] font-semibold text-purple-400/80 uppercase tracking-wider mt-1">{insightsData.overview.streak_days} Day Streak</span>
                     </div>
                   </div>
                 )}
@@ -2102,7 +2189,7 @@ export default function StudentPortal({ user, onLogout }) {
               {insightsData?.recommendations && insightsData.recommendations.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-indigo-400" /> Evidence-Based Recommendations
+                    <Lightbulb className="h-4 w-4 text-indigo-400" /> Recommendations
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     {insightsData.recommendations.map((rec, i) => (
@@ -2343,7 +2430,7 @@ export default function StudentPortal({ user, onLogout }) {
                     {/* AI Grounded Advice */}
                     <div className="p-4 bg-indigo-950/40 rounded-xl border border-indigo-800 text-indigo-200">
                       <p className="text-xs font-bold text-indigo-400 mb-1 flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5" /> Grounded Syllabus Study Tip
+                        <Lightbulb className="h-3.5 w-3.5" /> Study tip
                       </p>
                       <p className="text-sm text-indigo-100 leading-relaxed">{studyPlan.ai_advice}</p>
                     </div>
@@ -2582,6 +2669,7 @@ export default function StudentPortal({ user, onLogout }) {
               </div>
             </div>
           )}
+          </motion.div>
         </main>
       </div>
 

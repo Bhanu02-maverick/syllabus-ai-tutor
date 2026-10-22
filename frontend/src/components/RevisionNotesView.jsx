@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { BookMarked, Copy, Check, Printer, Download, Clock, Sparkles } from "lucide-react";
+import { BookMarked, Copy, Check, Printer, Download, Clock } from "lucide-react";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -73,7 +73,7 @@ export default function RevisionNotesView({ notesData, isDark, markdownComponent
               </span>
               {notesData.cached && (
                 <span className="vce-badge vce-badge-success">
-                  ⚡ Instant Cached
+                  Saved copy
                 </span>
               )}
             </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { motion, animate } from "framer-motion";
 import {
   Brain,
   Network,
@@ -31,6 +32,46 @@ function greeting() {
   if (h < 12) return "Good morning";
   if (h < 17) return "Good afternoon";
   return "Good evening";
+}
+
+/* Staggered entrance shared by every dashboard block */
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
+const item = {
+  hidden: { opacity: 0, y: 14 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+};
+
+/* Number that counts up from 0 when it first appears */
+function CountUp({ value, suffix = "" }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    const controls = animate(0, value, {
+      duration: 0.9,
+      ease: "easeOut",
+      onUpdate: (v) => setDisplay(Math.round(v)),
+    });
+    return () => controls.stop();
+  }, [value]);
+  return (
+    <>
+      {display}
+      {suffix}
+    </>
+  );
+}
+
+/* Progress bar that fills from empty */
+function Bar({ pct, colorClass, track, height = "h-2", delay = 0 }) {
+  return (
+    <div className={`w-full ${height} rounded-full overflow-hidden ${track}`}>
+      <motion.div
+        className={`h-full rounded-full ${colorClass}`}
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay }}
+      />
+    </div>
+  );
 }
 
 function masteryColor(pct) {
@@ -79,15 +120,15 @@ export default function StudentDashboard({
   const track = isDark ? "bg-slate-800" : "bg-slate-200";
 
   const stats = [
-    { icon: Award, value: `${masteredCount}/${indexedUnits.length}`, label: "Units mastered", hint: "80%+ in quizzes", tone: "text-success-500" },
-    { icon: BarChart3, value: `${Math.round(gamification?.accuracy_percent || 0)}%`, label: "Quiz average", hint: `${gamification?.total_quizzes_completed || 0} questions answered`, tone: "text-primary-500" },
-    { icon: Flame, value: gamification?.streak_days || 0, label: "Day streak", hint: "Study daily to grow it", tone: "text-amber-500" },
+    { icon: Award, value: <><CountUp value={masteredCount} />/{indexedUnits.length}</>, label: "Units mastered", hint: "80%+ in quizzes", tone: "text-success-500", bg: "bg-success-500/10" },
+    { icon: BarChart3, value: <CountUp value={Math.round(gamification?.accuracy_percent || 0)} suffix="%" />, label: "Quiz average", hint: `${gamification?.total_quizzes_completed || 0} questions answered`, tone: "text-primary-500", bg: "bg-primary-500/10" },
+    { icon: Flame, value: <CountUp value={gamification?.streak_days || 0} />, label: "Day streak", hint: "Study daily to grow it", tone: "text-amber-500", bg: "bg-amber-500/10" },
   ];
 
   return (
-    <div className="space-y-5">
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-5">
       {/* Greeting */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <motion.div variants={item} className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className={`text-2xl font-bold tracking-tight ${strong}`}>
             {greeting()}, {user.name} 👋
@@ -106,11 +147,11 @@ export default function StudentDashboard({
             <HelpCircle className="h-3.5 w-3.5" /> How it works
           </button>
         )}
-      </div>
+      </motion.div>
 
       {/* How it works guide */}
       {showGuide && (
-        <div className={`${card} relative`}>
+        <motion.div variants={item} className={`${card} relative`}>
           <button
             onClick={onToggleGuide}
             title="Hide guide"
@@ -126,10 +167,12 @@ export default function StudentDashboard({
             {GUIDE_STEPS.map((step, idx) => {
               const Icon = step.icon;
               return (
-                <button
+                <motion.button
                   key={step.tab}
                   onClick={() => onNavigate(step.tab)}
-                  className={`text-left p-3.5 rounded-xl border transition cursor-pointer group ${
+                  whileHover={{ y: -3 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`text-left p-3.5 rounded-xl border transition-colors cursor-pointer group ${
                     isDark ? "bg-slate-900/60 border-slate-800 hover:border-primary-500/50" : "bg-surface-tertiary border-slate-100 hover:border-primary-300 hover:bg-white"
                   }`}
                 >
@@ -144,15 +187,15 @@ export default function StudentDashboard({
                   <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-primary-500 opacity-0 group-hover:opacity-100 transition">
                     Open <ArrowRight className="h-3 w-3" />
                   </span>
-                </button>
+                </motion.button>
               );
             })}
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Continue learning + stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         <div className={`${card} lg:col-span-2 flex flex-col`}>
           <p className={`text-xs font-semibold uppercase tracking-wider ${muted}`}>Continue learning</p>
           {continueUnit ? (
@@ -167,12 +210,7 @@ export default function StudentDashboard({
                 </div>
               </div>
               <div className="mt-4">
-                <div className={`w-full h-2 rounded-full overflow-hidden ${track}`}>
-                  <div
-                    className={`h-full rounded-full ${masteryColor(continueUnit.mastery_percent)}`}
-                    style={{ width: `${Math.max(continueUnit.mastery_percent, 3)}%` }}
-                  />
-                </div>
+                <Bar pct={Math.max(continueUnit.mastery_percent, 3)} colorClass={masteryColor(continueUnit.mastery_percent)} track={track} delay={0.3} />
                 <p className={`text-[11px] mt-1.5 ${muted}`}>
                   {continueUnit.attempts > 0
                     ? `${continueUnit.mastery_percent}% mastered`
@@ -204,19 +242,21 @@ export default function StudentDashboard({
           {stats.map((s) => {
             const Icon = s.icon;
             return (
-              <div key={s.label} className={card}>
-                <Icon className={`h-5 w-5 ${s.tone}`} />
+              <motion.div key={s.label} whileHover={{ y: -3 }} className={card}>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${s.bg}`}>
+                  <Icon className={`h-5 w-5 ${s.tone}`} />
+                </div>
                 <p className={`text-3xl font-bold mt-3 ${strong}`}>{s.value}</p>
                 <p className={`text-sm font-medium ${isDark ? "text-slate-300" : "text-slate-700"}`}>{s.label}</p>
                 <p className={`text-[11px] mt-0.5 ${muted}`}>{s.hint}</p>
-              </div>
+              </motion.div>
             );
           })}
         </div>
-      </div>
+      </motion.div>
 
       {/* Focus areas + recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className={card}>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -231,7 +271,7 @@ export default function StudentDashboard({
             <p className={`text-xs ${muted}`}>No units yet.</p>
           ) : (
             <div className="space-y-3">
-              {focusUnits.slice(0, 5).map((u) => (
+              {focusUnits.slice(0, 5).map((u, idx) => (
                 <button
                   key={u.unit_number}
                   onClick={() => onQuizUnit(u.unit_number)}
@@ -245,12 +285,12 @@ export default function StudentDashboard({
                       {u.attempts > 0 ? `${u.mastery_percent}%` : "Not started"}
                     </span>
                   </div>
-                  <div className={`w-full h-2 rounded-full overflow-hidden ${track}`}>
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${u.attempts > 0 ? masteryColor(u.mastery_percent) : ""}`}
-                      style={{ width: `${u.attempts > 0 ? Math.max(u.mastery_percent, 3) : 0}%` }}
-                    />
-                  </div>
+                  <Bar
+                    pct={u.attempts > 0 ? Math.max(u.mastery_percent, 3) : 0}
+                    colorClass={u.attempts > 0 ? masteryColor(u.mastery_percent) : ""}
+                    track={track}
+                    delay={0.35 + idx * 0.08}
+                  />
                 </button>
               ))}
             </div>
@@ -280,9 +320,12 @@ export default function StudentDashboard({
             </div>
           ) : (
             <div className="space-y-1">
-              {recent.slice(0, 5).map((item) => (
-                <button
+              {recent.slice(0, 5).map((item, idx) => (
+                <motion.button
                   key={item.id}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 + idx * 0.06 }}
                   onClick={() => onNavigate("history")}
                   className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition cursor-pointer ${
                     isDark ? "hover:bg-slate-800/60" : "hover:bg-slate-50"
@@ -299,12 +342,12 @@ export default function StudentDashboard({
                     </p>
                   </div>
                   <ChevronRight className={`h-4 w-4 flex-shrink-0 ${muted}`} />
-                </button>
+                </motion.button>
               ))}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

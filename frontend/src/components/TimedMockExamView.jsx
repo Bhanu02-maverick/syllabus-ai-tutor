@@ -265,7 +265,7 @@ export default function TimedMockExamView({
           </div>
 
           <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 font-medium">
-            💡 <strong>AI Tutor Feedback:</strong> {mockExamReport.ai_feedback}
+            <strong>Tutor feedback:</strong> {mockExamReport.ai_feedback}
           </div>
 
           <div className="space-y-3">

@@ -46,6 +46,14 @@ async function request(path, options = {}, timeoutMs = 120000) {
   }
 }
 
+function buildQuery(params) {
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== null && v !== undefined && v !== "")
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join("&");
+  return qs ? `?${qs}` : "";
+}
+
 export const api = {
   setToken,
 
@@ -218,8 +226,8 @@ export const api = {
     request(`/faculty/documents/${docId}/version`, { method: "DELETE" }),
 
   // Phase 1: Mind Maps & Node Actions
-  getMindMap: (unitNumber, facultyId) =>
-    request(`/units/${unitNumber}/mindmap${facultyId ? `?faculty_id=${facultyId}` : ""}`, {}, 180000),
+  getMindMap: (unitNumber, facultyId, refresh = false) =>
+    request(`/units/${unitNumber}/mindmap${buildQuery({ faculty_id: facultyId, refresh: refresh || null })}`, {}, 180000),
 
   nodeAction: (unitNumber, nodeId, nodeLabel, action, facultyId) =>
     request("/mindmap/node-action", {
@@ -271,8 +279,11 @@ export const api = {
     }),
 
   // Phase 4: AI Revision Notes
-  getRevisionNotes: (unitNumber, facultyId) =>
-    request(`/units/${unitNumber}/notes${facultyId ? `?faculty_id=${facultyId}` : ""}`, {}, 180000),
+  getRevisionNotes: (unitNumber, facultyId, refresh = false) =>
+    request(`/units/${unitNumber}/notes${buildQuery({ faculty_id: facultyId, refresh: refresh || null })}`, {}, 180000),
+
+  getInsights: (facultyId, unitNumbers = null) =>
+    request(`/student/insights${buildQuery({ faculty_id: facultyId, unit_numbers: unitNumbers })}`),
 
   // Phase 5: Gamification Engine
   getGamification: () => request("/student/gamification"),

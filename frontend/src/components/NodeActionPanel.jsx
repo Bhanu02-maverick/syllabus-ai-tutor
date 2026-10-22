@@ -1,5 +1,15 @@
 import React, { useState } from "react";
-import { Sparkles, X, Loader2, BookOpen, Lightbulb, Target, MessageSquare, Send, CheckCircle2, HelpCircle } from "lucide-react";
+import {
+  X,
+  Loader2,
+  BookOpen,
+  Lightbulb,
+  Target,
+  MessageSquare,
+  Send,
+  CheckCircle2,
+  HelpCircle,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -21,7 +31,7 @@ export default function NodeActionPanel({ modal, onClose, isDark, markdownCompon
     ask: MessageSquare,
   };
 
-  const IconComponent = actionIcons[modal.action] || Sparkles;
+  const IconComponent = actionIcons[modal.action] || MessageSquare;
 
   // Determine layout positioning based on user audio request:
   // Explain -> LEFT side of page
@@ -120,7 +130,7 @@ export default function NodeActionPanel({ modal, onClose, isDark, markdownCompon
                 {modal.action === "ask" && (
                   <div className="pt-4 border-t border-slate-700/30 space-y-3">
                     <p className="text-xs font-bold text-purple-400 flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5" /> Ask a follow-up question on "{modal.nodeLabel}":
+                      <MessageSquare className="w-3.5 h-3.5" /> Ask a follow-up question on "{modal.nodeLabel}":
                     </p>
                     <form
                       onSubmit={(e) => {

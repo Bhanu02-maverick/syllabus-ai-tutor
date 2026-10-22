@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef } from "react";
 import {
   Compass,
-  Sparkles,
   BookOpen,
   Lightbulb,
   Target,
@@ -568,7 +567,7 @@ export default function MindMapVisualizer({
         {isCached && (
           <span className="vce-badge vce-badge-success">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            ⚡ Cached Concept Hierarchy
+            Saved copy
           </span>
         )}
       </div>

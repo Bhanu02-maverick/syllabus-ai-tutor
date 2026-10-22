@@ -45,6 +45,7 @@ from database import Base, engine, get_db
 import models
 import schemas
 from ingestion import ingest_pdf, get_faculty_db_dir
+from retrieval import hybrid_search, format_sources, unit_digest, clear_cache as clear_retrieval_cache
 from auth import hash_password, verify_password, create_access_token, get_current_user, require_role
 
 load_dotenv()
@@ -217,6 +218,38 @@ def get_vector_store(faculty_id: int):
             detail="No documents indexed yet for this subject. Faculty must upload a PDF first.",
         )
     return Chroma(persist_directory=db_dir, embedding_function=embeddings)
+
+
+def build_citations(docs, limit: int = 4) -> List[schemas.Citation]:
+    """One citation per distinct (file, page), with a short excerpt so students can check the source."""
+    seen, out = set(), []
+    for d in docs:
+        page = int(d.metadata.get("page", 0) or 0) + 1
+        src = d.metadata.get("source_file", "Course notes")
+        if (src, page) in seen:
+            continue
+        seen.add((src, page))
+        excerpt = " ".join(d.page_content.split())
+        out.append(schemas.Citation(
+            source=src,
+            page=page,
+            unit=d.metadata.get("unit", 1),
+            snippet=(excerpt[:220] + "…") if len(excerpt) > 220 else excerpt,
+        ))
+        if len(out) >= limit:
+            break
+    return out
+
+
+GROUNDING_RULES = (
+    "Rules:\n"
+    "- Use ONLY the numbered sources below. They are the student's own course notes.\n"
+    "- Keep the notes' own terminology and definitions; do not swap in textbook definitions from memory.\n"
+    "- If the sources do not contain the answer, say clearly: \"Your course notes don't cover this part.\" "
+    "and then share only what the notes do say.\n"
+    "- Refer to sources inline like (p. 14) using the page numbers given.\n"
+    "- Format with short Markdown headings or bullet points. No emojis.\n"
+)
 
 
 def majority_unit(docs) -> Optional[int]:
@@ -552,22 +585,22 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
     if req.unit_number is not None:
         filter_dict = {"unit": int(req.unit_number)}
     
-    # Prepend subtopic to vector query for high-precision semantic matching
+    # Prepend subtopic to the search query for high-precision matching
     semantic_query = req.query
     if req.subtopic and req.subtopic.strip():
-        semantic_query = f"Topic: {req.subtopic.strip()} - Question: {req.query}"
-        
-    # Syllabus-bound similarity score guardrail
-    results = store.similarity_search_with_relevance_scores(
+        semantic_query = f"{req.subtopic.strip()}: {req.query}"
+
+    # Hybrid (vector + keyword) retrieval; vector score drives the syllabus-bound guardrail
+    docs, top_score = hybrid_search(
+        store,
         semantic_query,
-        k=4,
-        filter=filter_dict,
+        unit_number=int(req.unit_number) if req.unit_number is not None else None,
+        k=6,
     )
 
     SIMILARITY_THRESHOLD = 0.40  # Defensible relevance threshold for out-of-syllabus guardrail
-    top_score = float(results[0][1]) if results else 0.0
 
-    if not results or top_score < SIMILARITY_THRESHOLD:
+    if not docs or top_score < SIMILARITY_THRESHOLD:
         rejected_answer = "This topic is outside the uploaded syllabus boundaries."
         # Audit trail logged in DoubtHistory
         try:
@@ -593,32 +626,21 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
             top_similarity=round(top_score, 4),
         )
 
-    # Filter context chunks by threshold
-    docs = [doc for doc, score in results if score >= SIMILARITY_THRESHOLD]
-    if not docs:
-        docs = [results[0][0]]
-
-    context = "\n\n".join([d.page_content for d in docs])
-    citations = [
-        schemas.Citation(
-            source=d.metadata.get("source_file", "Textbook"),
-            page=d.metadata.get("page", 0) + 1,
-            unit=d.metadata.get("unit", 1),
-        )
-        for d in docs
-    ]
+    sources = format_sources(docs)
+    citations = build_citations(docs)
 
     if req.mode == "analogy":
         system_instruction = (
-            "You are a helpful virtual tutor. Explain the following student query using intuitive, "
-            "everyday analogies while remaining strictly faithful to the provided textbook context.\n\n"
-            f"Context:\n{context}"
+            "You are a friendly tutor. First give the answer as the course notes state it (2-4 sentences), "
+            "then explain it with one everyday analogy a student can relate to, and end with how the analogy "
+            "maps back to the concept.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
     else:
         system_instruction = (
-            "You are a strict university examination evaluator. Provide a technically precise, concise, "
-            "and syllabus-compliant answer based EXCLUSIVELY on the context below. Do not guess or extrapolate.\n\n"
-            f"Context:\n{context}"
+            "You are a university tutor writing an exam-ready answer. Structure it as: a one-line definition, "
+            "the key points as bullets, and an example if the notes give one. Be precise and concise.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
 
     response = safe_llm_invoke([
@@ -638,7 +660,7 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
             query=req.query,
             mode=req.mode,
             answer=answer_text,
-            citations_json=json.dumps([c.dict() for c in citations[:2]]),
+            citations_json=json.dumps([c.dict() for c in citations]),
             top_similarity=round(top_score, 4),
         )
         db.add(doubt)
@@ -648,7 +670,7 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
 
     return schemas.AskResponse(
         answer=answer_text,
-        citations=citations[:2],
+        citations=citations,
         unit_number=resolved_unit,
         top_similarity=round(top_score, 4),
     )
@@ -813,6 +835,13 @@ def upload_document(
 
     try:
         chunk_count = ingest_pdf(dest_path, unit_number=resolved_number, unit_name=resolved_name, faculty_id=fid, source_filename=file.filename)
+        # New material: previously generated mind maps / notes for this unit are now stale
+        for cache_model in (models.MindMapCache, models.RevisionNotesCache):
+            db.query(cache_model).filter(
+                cache_model.faculty_id == fid, cache_model.unit_number == resolved_number
+            ).delete()
+        db.commit()
+        clear_retrieval_cache()
         doc.status = "indexed" if chunk_count > 0 else "failed"
         doc.chunk_count = chunk_count
     except Exception as e:
@@ -1367,8 +1396,7 @@ def explain_again(
 ):
     fid = _resolve_faculty_id(user, req.faculty_id)
     store = get_vector_store(fid)
-    retriever = store.as_retriever(search_kwargs={"k": 3})
-    docs = retriever.invoke(req.query)
+    docs, _ = hybrid_search(store, req.query, k=5)
 
     if not docs:
         return schemas.AskResponse(
@@ -1377,28 +1405,20 @@ def explain_again(
             unit_number=None,
         )
 
-    context = "\n\n".join([d.page_content for d in docs])
-    citations = [
-        schemas.Citation(
-            source=d.metadata.get("source_file", "Textbook"),
-            page=d.metadata.get("page", 0) + 1,
-            unit=d.metadata.get("unit", 1),
-        )
-        for d in docs
-    ]
+    sources = format_sources(docs)
+    citations = build_citations(docs)
 
     if req.style == "simpler":
         system_instruction = (
-            "You are a patient tutor. Explain the following concept in the simplest possible way, "
-            "as if teaching a complete beginner. Use everyday analogies and avoid jargon. "
-            "Keep it concise but thorough.\n\n"
-            f"Context:\n{context}"
+            "You are a patient tutor. Explain the concept in the simplest possible way, as if teaching a "
+            "beginner. Use short sentences and one everyday analogy, but keep the notes' definitions.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
     else:
         system_instruction = (
-            "You are an expert tutor. Provide a detailed, in-depth explanation with examples, "
-            "edge cases, and technical depth. Include diagrams described in text if helpful.\n\n"
-            f"Context:\n{context}"
+            "You are an expert tutor. Give a detailed explanation covering every point the notes make on this "
+            "topic, with the examples the notes give.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
 
     response = safe_llm_invoke([
@@ -1417,7 +1437,7 @@ def explain_again(
             query=f"[{req.style}] {req.query}",
             mode=req.style,
             answer=answer_text,
-            citations_json=json.dumps([c.dict() for c in citations[:2]]),
+            citations_json=json.dumps([c.dict() for c in citations]),
         )
         db.add(doubt)
         db.commit()
@@ -1426,7 +1446,7 @@ def explain_again(
 
     return schemas.AskResponse(
         answer=answer_text,
-        citations=citations[:2],
+        citations=citations,
         unit_number=majority_unit(docs),
     )
 
@@ -1730,6 +1750,7 @@ def delete_admin_user(
 def get_unit_mindmap(
     unit_number: int,
     faculty_id: Optional[int] = None,
+    refresh: bool = False,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
@@ -1740,11 +1761,15 @@ def get_unit_mindmap(
     ).first()
     unit_name = unit.unit_name if unit else f"Unit {unit_number}"
 
-    # 1. Check DB Cache
-    cached_entry = db.query(models.MindMapCache).filter(
+    # 1. Check DB Cache (refresh=true regenerates from the notes)
+    cache_q = db.query(models.MindMapCache).filter(
         models.MindMapCache.faculty_id == fid,
         models.MindMapCache.unit_number == unit_number
-    ).first()
+    )
+    if refresh:
+        cache_q.delete()
+        db.commit()
+    cached_entry = cache_q.first()
 
     if cached_entry:
         try:
@@ -1758,17 +1783,17 @@ def get_unit_mindmap(
         except Exception:
             pass
 
-    # 2. Fetch unit vector store context
+    # 2. Read the whole unit in page order (not a handful of chunks) so the map mirrors the notes
     store = get_vector_store(fid)
-    docs = store.similarity_search(f"Unit {unit_number} topics key concepts overview", filter={"unit": unit_number}, k=6)
-    if not docs:
-        docs = store.similarity_search(f"Unit {unit_number} key concepts", k=4)
-
-    context = "\n\n".join([d.page_content for d in docs]) if docs else "Overview of unit topics."
+    context = unit_digest(store, unit_number, max_chars=28000) or "Overview of unit topics."
 
     prompt = (
-        f"Analyze the syllabus context for Unit {unit_number}: '{unit_name}'.\n"
-        "Generate a structured hierarchical JSON tree representing the core mind map for this unit.\n"
+        f"Below are the complete lecture notes for Unit {unit_number}: '{unit_name}', in page order.\n"
+        "Build a mind map of THIS unit as the notes teach it:\n"
+        "- Main branches = the major sections/headings of the notes, in the order they appear (4-8 branches).\n"
+        "- Children = the sub-points, types, steps or examples the notes list under that section (2-6 each).\n"
+        "- Use the exact terms the notes use. Do NOT add topics that are not in the notes.\n"
+        "- Each description is one short sentence taken from what the notes say, ending with its page like (p. 7).\n"
         "Return ONLY a valid JSON object matching this exact schema:\n"
         "{\n"
         '  "id": "root",\n'
@@ -1785,7 +1810,7 @@ def get_unit_mindmap(
         '    }\n'
         '  ]\n'
         "}\n\n"
-        f"Syllabus Context:\n{context[:3000]}"
+        f"Lecture notes:\n{context}"
     )
 
     try:
@@ -1838,20 +1863,24 @@ def handle_mindmap_node_action(
 ):
     fid = _resolve_faculty_id(user, req.faculty_id)
     store = get_vector_store(fid)
-    docs = store.similarity_search(f"Unit {req.unit_number} {req.node_label}", k=3)
-    context = "\n\n".join([d.page_content for d in docs]) if docs else f"Concept: {req.node_label}"
+    docs, _ = hybrid_search(store, req.node_label, unit_number=req.unit_number, k=4)
+    if not docs:
+        docs, _ = hybrid_search(store, req.node_label, k=4)
+    sources = format_sources(docs) if docs else f"Concept: {req.node_label}"
 
     if req.action == "explain":
-        prompt = f"Explain the concept '{req.node_label}' clearly in 3 concise bullet points for a student studying for an exam based on this context:\n{context[:2000]}"
+        task = f"Explain '{req.node_label}' in 3 concise bullet points for a student revising for an exam."
     elif req.action == "example":
-        prompt = f"Provide a clear real-world example explaining how '{req.node_label}' is used in practice based on this context:\n{context[:2000]}"
+        task = f"Give the example the notes use for '{req.node_label}'. If the notes have none, give one simple example consistent with the notes and say it is illustrative."
     elif req.action == "quiz":
-        prompt = f"Generate 1 multiple choice practice question testing '{req.node_label}' with 4 options and the correct answer indicated clearly."
+        task = f"Write 1 multiple-choice question testing '{req.node_label}' with 4 options (A-D), then the correct answer and a one-line reason."
     else:
-        prompt = f"Explain '{req.node_label}' concisely based on:\n{context[:2000]}"
+        task = f"Explain '{req.node_label}' concisely."
+
+    prompt = f"{task}\n\n{GROUNDING_RULES}\nSources:\n{sources}"
 
     response = safe_llm_invoke([
-        {"role": "system", "content": "You are a helpful virtual tutor explaining a specific mind map concept node."},
+        {"role": "system", "content": "You are a helpful tutor explaining one concept from the student's course notes."},
         {"role": "user", "content": prompt}
     ])
     content = extract_text(response).strip()
@@ -1953,13 +1982,14 @@ def generate_mock_exam(
     q_id_counter = 1
 
     for u_num in selected_units:
-        docs = store.similarity_search(f"Unit {u_num} core concepts exam questions", k=3)
-        context = "\n\n".join([d.page_content for d in docs]) if docs else f"Unit {u_num} overview"
+        # Sample across the whole unit so questions cover more than one section
+        context = unit_digest(store, u_num, max_chars=9000) or f"Unit {u_num} overview"
 
         prompt = (
-            f"Generate exactly {questions_per_unit} multiple choice exam questions for Unit {u_num}.\n"
+            f"Generate exactly {questions_per_unit} multiple choice exam questions for Unit {u_num}, "
+            "using ONLY facts from the notes below and spreading them across different sections.\n"
             "Return ONLY a JSON array of objects with keys: 'question', 'options' (4 strings), 'correct_answer', 'explanation'.\n\n"
-            f"Context:\n{context[:2500]}"
+            f"Notes:\n{context}"
         )
 
         try:
@@ -2086,6 +2116,7 @@ def submit_mock_exam(
 def get_unit_revision_notes(
     unit_number: int,
     faculty_id: Optional[int] = None,
+    refresh: bool = False,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
@@ -2096,11 +2127,15 @@ def get_unit_revision_notes(
     ).first()
     unit_name = unit.unit_name if unit else f"Unit {unit_number}"
 
-    # 1. Check DB Cache
-    cached_notes = db.query(models.RevisionNotesCache).filter(
+    # 1. Check DB Cache (refresh=true regenerates from the notes)
+    notes_q = db.query(models.RevisionNotesCache).filter(
         models.RevisionNotesCache.faculty_id == fid,
         models.RevisionNotesCache.unit_number == unit_number
-    ).first()
+    )
+    if refresh:
+        notes_q.delete()
+        db.commit()
+    cached_notes = notes_q.first()
 
     if cached_notes:
         return schemas.RevisionNotesResponse(
@@ -2110,20 +2145,22 @@ def get_unit_revision_notes(
             cached=True
         )
 
-    # 2. Query RAG vector store for comprehensive unit notes
+    # 2. Read the whole unit (this used to search every unit and could mix in other units' content)
     store = get_vector_store(fid)
-    docs = store.similarity_search(f"Unit {unit_number} definitions formulas key exam points overview", k=8)
-    context = "\n\n".join([d.page_content for d in docs]) if docs else f"Notes for {unit_name}"
+    context = unit_digest(store, unit_number, max_chars=28000) or f"Notes for {unit_name}"
 
     prompt = (
-        f"Create comprehensive high-yield Exam Revision Notes for Unit {unit_number}: '{unit_name}'.\n"
-        "Format in clean, structured GitHub Markdown with the following sections:\n\n"
-        "### 1. 📌 Core Concepts & Overview\n"
-        "### 2. 📖 Key Definitions\n"
-        "### 3. ⚙️ Formulas & Theoretical Rules\n"
-        "### 4. 🎯 High-Yield Exam Points\n"
-        "### 5. ❓ Expected Examination Questions\n\n"
-        f"Syllabus Context:\n{context[:3500]}"
+        f"Below are the complete lecture notes for Unit {unit_number}: '{unit_name}', in page order.\n"
+        "Write exam revision notes that summarise THESE notes, section by section, in the order they appear.\n"
+        "Use the notes' own definitions and terms; do not add material that is not in them. "
+        "Put the page number after each point like (p. 7). No emojis.\n"
+        "Format in clean GitHub Markdown with these sections:\n\n"
+        "### 1. Overview\n"
+        "### 2. Key Definitions\n"
+        "### 3. Important Concepts (one sub-heading per section of the notes)\n"
+        "### 4. Formulas, Algorithms & Steps (only if the notes have them)\n"
+        "### 5. Likely Exam Questions\n\n"
+        f"Lecture notes:\n{context}"
     )
 
     response = safe_llm_invoke([
@@ -2238,6 +2275,123 @@ def get_student_gamification(
         accuracy_percent=accuracy_pct,
         badges=badges
     )
+
+
+@app.get("/student/insights")
+def get_student_insights(
+    faculty_id: Optional[int] = None,
+    unit_numbers: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """
+    Topic-level mastery computed directly from the student's quiz attempts (no LLM call),
+    so every number on the Weak Topics page is traceable to real answers.
+    """
+    fid = _resolve_faculty_id(user, faculty_id)
+    q = db.query(models.QuizAttempt).filter(
+        models.QuizAttempt.user_id == user.id,
+        models.QuizAttempt.faculty_id == fid,
+    )
+    if unit_numbers:
+        wanted = [int(x) for x in unit_numbers.split(",") if x.strip().isdigit()]
+        if wanted:
+            q = q.filter(models.QuizAttempt.unit_number.in_(wanted))
+    attempts = q.all()
+
+    units = {u.unit_number: u.unit_name for u in db.query(models.Unit).filter(models.Unit.faculty_id == fid).all()}
+
+    groups: dict = {}
+    for a in attempts:
+        topic = (a.topic_query or "").strip()
+        if not topic or topic.lower().startswith(("unit ", "diagnostic")):
+            topic = units.get(a.unit_number, f"Unit {a.unit_number}")
+        g = groups.setdefault((a.unit_number, topic), {"total": 0, "correct": 0})
+        g["total"] += 1
+        g["correct"] += 1 if a.is_correct else 0
+
+    topics = []
+    for (unit_no, topic), g in groups.items():
+        mastery = round(g["correct"] / g["total"] * 100, 1)
+        status = "strong" if mastery >= 80 else "developing" if mastery >= 50 else "weak"
+        topics.append({
+            "unit_number": unit_no,
+            "topic": topic,
+            "total_attempts": g["total"],
+            "correct_count": g["correct"],
+            "mastery_percent": mastery,
+            "status": status,
+        })
+    topics.sort(key=lambda t: (t["mastery_percent"], -t["total_attempts"]))
+
+    weak = [t for t in topics if t["status"] == "weak"]
+    strong = [t for t in topics if t["status"] == "strong"]
+    weak_topics = [
+        {
+            **t,
+            "priority": "High" if t["mastery_percent"] < 35 else "Medium",
+            "why_evidence": f"{t['correct_count']} of {t['total_attempts']} answers correct on this topic.",
+        }
+        for t in weak
+    ]
+
+    total = len(attempts)
+    correct = sum(1 for a in attempts if a.is_correct)
+    game = get_student_gamification(db=db, user=user)
+
+    recommendations = []
+    if weak:
+        w = weak[0]
+        recommendations.append({
+            "type": "review", "title": "Review first", "topic": w["topic"], "unit_number": w["unit_number"],
+            "evidence_why": f"Your lowest score: {w['mastery_percent']}% over {w['total_attempts']} questions. Re-read it, then retry a quiz.",
+            "action_type": "explain",
+        })
+    developing = [t for t in topics if t["status"] == "developing"]
+    if developing:
+        d = developing[0]
+        recommendations.append({
+            "type": "practice", "title": "Almost there", "topic": d["topic"], "unit_number": d["unit_number"],
+            "evidence_why": f"{d['mastery_percent']}% so far. One more quiz could push it above 80%.",
+            "action_type": "quiz",
+        })
+    attempted_units = {a.unit_number for a in attempts}
+    untouched = [n for n in sorted(units) if n not in attempted_units]
+    if untouched:
+        n = untouched[0]
+        recommendations.append({
+            "type": "focus_next", "title": "Not started", "topic": units[n], "unit_number": n,
+            "evidence_why": f"You haven't practised Unit {n} yet. Start by asking a doubt or reading its notes.",
+            "action_type": "study",
+        })
+    if strong:
+        st = strong[-1]
+        recommendations.append({
+            "type": "maintain", "title": "Keep it fresh", "topic": st["topic"], "unit_number": st["unit_number"],
+            "evidence_why": f"Strong at {st['mastery_percent']}%. A quick quiz before the exam keeps it that way.",
+            "action_type": "quiz",
+        })
+
+    has_data = total >= 3
+    return {
+        "is_new_learner": total == 0,
+        "new_learner_message": None if has_data else
+            "Answer at least 3 quiz questions so we can measure which topics you know and which need work.",
+        "overview": {
+            "has_sufficient_data": has_data,
+            "overall_mastery": round(correct / total * 100, 1) if total else 0.0,
+            "total_attempts": total,
+            "questions_answered": total,
+            "correct_answers": correct,
+            "weak_count": len(weak),
+            "strong_count": len(strong),
+            "xp": game.xp,
+            "streak_days": game.streak_days,
+        },
+        "recommendations": recommendations[:4],
+        "weak_topics": weak_topics,
+        "topic_mastery_list": topics,
+    }
 
 
 @app.get("/health")
