@@ -1761,15 +1761,12 @@ def get_unit_mindmap(
     ).first()
     unit_name = unit.unit_name if unit else f"Unit {unit_number}"
 
-    # 1. Check DB Cache (refresh=true regenerates from the notes)
+    # 1. Check DB Cache (refresh=true skips it; the old copy is only replaced once a new one succeeds)
     cache_q = db.query(models.MindMapCache).filter(
         models.MindMapCache.faculty_id == fid,
         models.MindMapCache.unit_number == unit_number
     )
-    if refresh:
-        cache_q.delete()
-        db.commit()
-    cached_entry = cache_q.first()
+    cached_entry = None if refresh else cache_q.first()
 
     if cached_entry:
         try:
@@ -1825,8 +1822,12 @@ def get_unit_mindmap(
                 raw_text = raw_text[4:]
             raw_text = raw_text.strip()
         tree_data = json.loads(raw_text)
+        generated = True
     except Exception:
-        # Fallback tree structure if JSON parsing fails
+        generated = False
+        if refresh and cache_q.first():
+            raise HTTPException(status_code=503, detail="Couldn't rebuild the mind map right now (AI service busy). Your previous mind map is kept.")
+        # Fallback tree structure if JSON parsing fails (shown, but never cached)
         tree_data = {
             "id": "root",
             "label": unit_name,
@@ -1838,14 +1839,15 @@ def get_unit_mindmap(
             ]
         }
 
-    # Save to Cache
-    new_cache = models.MindMapCache(
-        faculty_id=fid,
-        unit_number=unit_number,
-        mindmap_json=json.dumps(tree_data)
-    )
-    db.add(new_cache)
-    db.commit()
+    # Save to Cache, replacing any older copy
+    if generated:
+        cache_q.delete()
+        db.add(models.MindMapCache(
+            faculty_id=fid,
+            unit_number=unit_number,
+            mindmap_json=json.dumps(tree_data)
+        ))
+        db.commit()
 
     return schemas.MindMapResponse(
         unit_number=unit_number,
@@ -2127,15 +2129,12 @@ def get_unit_revision_notes(
     ).first()
     unit_name = unit.unit_name if unit else f"Unit {unit_number}"
 
-    # 1. Check DB Cache (refresh=true regenerates from the notes)
+    # 1. Check DB Cache (refresh=true skips it; the old copy is only replaced once new notes succeed)
     notes_q = db.query(models.RevisionNotesCache).filter(
         models.RevisionNotesCache.faculty_id == fid,
         models.RevisionNotesCache.unit_number == unit_number
     )
-    if refresh:
-        notes_q.delete()
-        db.commit()
-    cached_notes = notes_q.first()
+    cached_notes = None if refresh else notes_q.first()
 
     if cached_notes:
         return schemas.RevisionNotesResponse(
@@ -2163,19 +2162,28 @@ def get_unit_revision_notes(
         f"Lecture notes:\n{context}"
     )
 
-    response = safe_llm_invoke([
-        {"role": "system", "content": "You are an expert professor writing syllabus-bound revision notes."},
-        {"role": "user", "content": prompt}
-    ])
-    notes_markdown = extract_text(response).strip()
+    try:
+        response = safe_llm_invoke([
+            {"role": "system", "content": "You are an expert professor writing syllabus-bound revision notes."},
+            {"role": "user", "content": prompt}
+        ])
+        notes_markdown = extract_text(response).strip()
+    except Exception:
+        notes_markdown = ""
+    if not notes_markdown:
+        raise HTTPException(
+            status_code=503,
+            detail="Couldn't write the notes right now (AI service busy). "
+            + ("Your previous notes are kept." if notes_q.first() else "Please try again in a minute."),
+        )
 
-    # Save to Cache
-    new_cache = models.RevisionNotesCache(
+    # Save to Cache, replacing any older copy
+    notes_q.delete()
+    db.add(models.RevisionNotesCache(
         faculty_id=fid,
         unit_number=unit_number,
         notes_json=notes_markdown
-    )
-    db.add(new_cache)
+    ))
     db.commit()
 
     return schemas.RevisionNotesResponse(

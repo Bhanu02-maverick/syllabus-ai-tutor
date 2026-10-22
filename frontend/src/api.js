@@ -227,7 +227,7 @@ export const api = {
 
   // Phase 1: Mind Maps & Node Actions
   getMindMap: (unitNumber, facultyId, refresh = false) =>
-    request(`/units/${unitNumber}/mindmap${buildQuery({ faculty_id: facultyId, refresh: refresh || null })}`, {}, 180000),
+    request(`/units/${unitNumber}/mindmap${buildQuery({ faculty_id: facultyId, refresh: refresh || null })}`, {}, 300000),
 
   nodeAction: (unitNumber, nodeId, nodeLabel, action, facultyId) =>
     request("/mindmap/node-action", {
@@ -280,7 +280,7 @@ export const api = {
 
   // Phase 4: AI Revision Notes
   getRevisionNotes: (unitNumber, facultyId, refresh = false) =>
-    request(`/units/${unitNumber}/notes${buildQuery({ faculty_id: facultyId, refresh: refresh || null })}`, {}, 180000),
+    request(`/units/${unitNumber}/notes${buildQuery({ faculty_id: facultyId, refresh: refresh || null })}`, {}, 300000),
 
   getInsights: (facultyId, unitNumbers = null) =>
     request(`/student/insights${buildQuery({ faculty_id: facultyId, unit_numbers: unitNumbers })}`),

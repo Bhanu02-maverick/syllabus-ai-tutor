@@ -359,12 +359,14 @@ export default function StudentPortal({ user, onLogout }) {
   const [mindMapUnit, setMindMapUnit] = useState("1");
   const [mindMapData, setMindMapData] = useState(null);
   const [mindMapLoading, setMindMapLoading] = useState(false);
+  const [mindMapError, setMindMapError] = useState("");
   const [nodeModal, setNodeModal] = useState({ isOpen: false, nodeLabel: "", action: "", content: "", loading: false });
 
   // Revision Notes state
   const [notesUnit, setNotesUnit] = useState("1");
   const [revisionNotesData, setRevisionNotesData] = useState(null);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState("");
   const [copiedNotes, setCopiedNotes] = useState(false);
 
   // Adaptive Quiz state
@@ -463,11 +465,12 @@ export default function StudentPortal({ user, onLogout }) {
     const targetUnit = unitNum || mindMapUnit;
     if (!selectedFacultyId || !targetUnit) return;
     setMindMapLoading(true);
+    setMindMapError("");
     try {
       const data = await api.getMindMap(Number(targetUnit), selectedFacultyId, refresh);
       setMindMapData(data);
     } catch (err) {
-      alert(err.message || "Could not generate Mind Map.");
+      setMindMapError(err.message || "Could not generate the mind map.");
     } finally {
       setMindMapLoading(false);
     }
@@ -518,11 +521,12 @@ export default function StudentPortal({ user, onLogout }) {
     const targetUnit = unitNum || notesUnit;
     if (!selectedFacultyId || !targetUnit) return;
     setNotesLoading(true);
+    setNotesError("");
     try {
       const data = await api.getRevisionNotes(Number(targetUnit), selectedFacultyId, refresh);
       setRevisionNotesData(data);
     } catch (err) {
-      alert(err.message || "Could not load revision notes.");
+      setNotesError(err.message || "Could not load revision notes.");
     } finally {
       setNotesLoading(false);
     }
@@ -687,21 +691,25 @@ export default function StudentPortal({ user, onLogout }) {
     }
   };
 
-  const handleAsk = async (e) => {
-    e.preventDefault();
-    if (!query.trim() || !selectedFacultyId) return;
+  // `override` lets other pages (e.g. a revision-notes exam question) ask directly
+  const handleAsk = async (e, override = null) => {
+    e?.preventDefault();
+    const askText = override?.query ?? query;
+    const askUnit = override ? override.unit : qaUnitSelect;
+    const askSubtopic = override ? null : qaSubtopicSelect;
+    if (!askText.trim() || !selectedFacultyId) return;
     setLoading(true);
     setResult(null);
     try {
       const data = await api.ask(
-        query,
+        askText,
         mode,
         selectedFacultyId,
-        qaUnitSelect ? Number(qaUnitSelect) : null,
-        qaSubtopicSelect || null
+        askUnit ? Number(askUnit) : null,
+        askSubtopic || null
       );
       setResult(data);
-      setLastQuery(query);
+      setLastQuery(askText);
     } catch (err) {
       console.error(err);
       setResult({
@@ -931,7 +939,7 @@ export default function StudentPortal({ user, onLogout }) {
 
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-x-clip ${
       isDark ? "dark bg-surface-dark text-slate-100" : "bg-surface-secondary text-slate-800"
     }`}>
       {/* Soft static backdrop: a faint top glow instead of the animated particle network */}
@@ -1678,6 +1686,12 @@ export default function StudentPortal({ user, onLogout }) {
                 </div>
               </div>
 
+              {mindMapError && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border text-xs font-medium bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {mindMapError}
+                </div>
+              )}
+
               {mindMapLoading ? (
                 <div
                   className={`vce-card p-12 text-center space-y-4 ${
@@ -1779,6 +1793,12 @@ export default function StudentPortal({ user, onLogout }) {
                 </div>
               </div>
 
+              {notesError && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border text-xs font-medium bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {notesError}
+                </div>
+              )}
+
               {notesLoading ? (
                 <div
                   className={`vce-card p-12 text-center space-y-4 ${
@@ -1800,6 +1820,13 @@ export default function StudentPortal({ user, onLogout }) {
                   notesData={revisionNotesData}
                   isDark={isDark}
                   markdownComponents={markdownComponents}
+                  onAskQuestion={(q, unitNumber) => {
+                    setActiveTab("study");
+                    setQuery(q);
+                    setQaUnitSelect(String(unitNumber));
+                    setQaSubtopicSelect("");
+                    handleAsk(null, { query: q, unit: String(unitNumber) });
+                  }}
                 />
               ) : (
                 <div

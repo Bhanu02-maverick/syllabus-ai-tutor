@@ -321,7 +321,7 @@ export default function FacultyDashboard({ user, onLogout }) {
       : 0;
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-x-clip ${
       isDark ? "bg-[#0B1020] text-slate-100" : "bg-[#F8FAFC] text-slate-800"
     }`}>
       {/* Soft static backdrop */}
