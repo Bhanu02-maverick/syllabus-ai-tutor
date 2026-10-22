@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   XCircle,
   ArrowRight,
-  Sparkles,
   RefreshCw,
   Zap,
   Send,
@@ -13,6 +12,8 @@ import {
   AlertTriangle,
   Loader2,
   Award,
+  Lightbulb,
+  FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -231,7 +232,7 @@ export default function InteractiveQuizView({
                   }`}
                 >
                   <p className="font-bold flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4" /> Explanation:
+                    <Lightbulb className="w-4 h-4" /> Explanation:
                   </p>
                   <p className="leading-relaxed opacity-90">
                     {adaptiveState.questionData.explanation}
@@ -318,7 +319,7 @@ export default function InteractiveQuizView({
                   disabled={quizLoading || indexedUnits.length === 0}
                   className="vce-btn vce-btn-primary vce-btn-sm"
                 >
-                  {quizLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  {quizLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                   {quizLoading ? "Generating Quiz..." : "Start Quiz"}
                 </button>
               </div>

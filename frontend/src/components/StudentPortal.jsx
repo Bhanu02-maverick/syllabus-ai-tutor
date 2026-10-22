@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   Loader2,
   ClipboardList,
-  Sparkles,
   Award,
   Brain,
   Target,
@@ -33,6 +32,7 @@ import {
   Copy,
   Check,
   RotateCcw,
+  Lightbulb,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -43,17 +43,12 @@ import rehypeRaw from "rehype-raw";
 import { preprocessLaTeX } from "../utils/latexHelper.js";
 import { api } from "../api";
 import ThemeToggle from "./ThemeToggle.jsx";
-import GamificationCard from "./GamificationCard.jsx";
-import AIThinking from "./AIThinking.jsx";
 import NodeActionPanel from "./NodeActionPanel.jsx";
 import MindMapVisualizer from "./MindMapVisualizer.jsx";
 import RevisionNotesView from "./RevisionNotesView.jsx";
 import InteractiveQuizView from "./InteractiveQuizView.jsx";
 import TimedMockExamView from "./TimedMockExamView.jsx";
-import NetworkCanvas from "./NetworkCanvas.jsx";
-import WorkspaceHero from "./WorkspaceHero.jsx";
-import GamificationConstellation from "./GamificationConstellation.jsx";
-import RAGNodeVisualizer from "./RAGNodeVisualizer.jsx";
+import StudentDashboard from "./StudentDashboard.jsx";
 
 
 
@@ -137,32 +132,32 @@ function RenderMindMapNode({ node, onAction }) {
       <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs hover:shadow-md transition">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-            <Sparkles className="h-4 w-4 text-indigo-500" /> {node.label}
+            <Lightbulb className="h-4 w-4 text-indigo-500" /> {node.label}
           </span>
           <div className="flex items-center gap-1.5 flex-wrap">
             <button
               onClick={() => onAction(node.id, node.label, "explain")}
               className="text-[11px] font-semibold px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md border border-blue-200 transition cursor-pointer"
             >
-              💡 Explain
+              Explain
             </button>
             <button
               onClick={() => onAction(node.id, node.label, "example")}
               className="text-[11px] font-semibold px-2 py-1 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-md border border-amber-200 transition cursor-pointer"
             >
-              🔍 Example
+              Example
             </button>
             <button
               onClick={() => onAction(node.id, node.label, "quiz")}
               className="text-[11px] font-semibold px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md border border-emerald-200 transition cursor-pointer"
             >
-              🎯 Quiz Me
+              Quiz me
             </button>
             <button
               onClick={() => onAction(node.id, node.label, "ask")}
               className="text-[11px] font-semibold px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-md border border-purple-200 transition cursor-pointer"
             >
-              💬 Ask AI
+              Ask
             </button>
           </div>
         </div>
@@ -206,14 +201,14 @@ export default function StudentPortal({ user, onLogout }) {
   // ─── Browser History & Routing Synchronization ────────────────────────
   const getInitialTab = () => {
     const hash = window.location.hash.replace("#", "").toLowerCase();
-    const validTabs = ["study", "qa", "mindmap", "notes", "revision", "quiz", "mock_exam", "mock", "insights", "history"];
+    const validTabs = ["dashboard", "study", "qa", "mindmap", "notes", "revision", "quiz", "mock_exam", "mock", "insights", "history"];
     if (validTabs.includes(hash)) {
       if (hash === "qa") return "study";
       if (hash === "revision") return "notes";
       if (hash === "mock") return "mock_exam";
       return hash;
     }
-    return "study";
+    return "dashboard";
   };
 
   const [activeTab, setActiveTabState] = useState(getInitialTab);
@@ -226,6 +221,7 @@ export default function StudentPortal({ user, onLogout }) {
     if (target === "mock") target = "mock_exam";
 
     setActiveTabState(target);
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
     if (pushState && window.history) {
       const currentHash = window.location.hash.replace("#", "").toLowerCase();
@@ -234,6 +230,24 @@ export default function StudentPortal({ user, onLogout }) {
       }
     }
   }, []);
+
+  // Browser tab title follows the current page
+  useEffect(() => {
+    const titles = {
+      dashboard: "Dashboard",
+      study: "Ask a Doubt",
+      mindmap: "Mind Maps",
+      notes: "Revision Notes",
+      quiz: "Quizzes",
+      mock_exam: "Mock Exams",
+      insights: "Weak Topics & Plan",
+      history: "My Questions",
+    };
+    document.title = `${titles[activeTab] || "Student"} · VCE AI Tutor`;
+    return () => {
+      document.title = "VCE AI Tutor";
+    };
+  }, [activeTab]);
 
   // Listen to browser Back / Forward buttons (popstate event)
   useEffect(() => {
@@ -249,13 +263,13 @@ export default function StudentPortal({ user, onLogout }) {
     const handlePopState = (event) => {
       const stateTab = event.state?.tab;
       const hashTab = window.location.hash.replace("#", "").toLowerCase();
-      let targetTab = stateTab || hashTab || "study";
+      let targetTab = stateTab || hashTab || "dashboard";
 
       if (targetTab === "qa") targetTab = "study";
       if (targetTab === "revision") targetTab = "notes";
       if (targetTab === "mock") targetTab = "mock_exam";
 
-      const validTabs = ["study", "mindmap", "notes", "quiz", "mock_exam", "insights", "history"];
+      const validTabs = ["dashboard", "study", "mindmap", "notes", "quiz", "mock_exam", "insights", "history"];
       if (validTabs.includes(targetTab)) {
         setActiveTabState(targetTab);
       }
@@ -277,6 +291,7 @@ export default function StudentPortal({ user, onLogout }) {
   const [result, setResult] = useState(null);
   const [lastQuery, setLastQuery] = useState(""); // for explain-again
   const [explainLoading, setExplainLoading] = useState(false);
+  const [copiedAnswer, setCopiedAnswer] = useState(false);
 
   // Quiz tab state
   const [quizUnitSelect, setQuizUnitSelect] = useState("");
@@ -316,7 +331,24 @@ export default function StudentPortal({ user, onLogout }) {
 
   // Gamification state
   const [gamification, setGamification] = useState(null);
-  const [showHero, setShowHero] = useState(true);
+  const [showGuide, setShowGuide] = useState(() => {
+    try {
+      return localStorage.getItem("vce_hide_guide") !== "1";
+    } catch {
+      return true;
+    }
+  });
+
+  const toggleGuide = () => {
+    setShowGuide((prev) => {
+      try {
+        localStorage.setItem("vce_hide_guide", prev ? "1" : "0");
+      } catch {
+        /* storage unavailable — keep in-memory state only */
+      }
+      return !prev;
+    });
+  };
 
 
   // Topic filter state for Q&A
@@ -327,12 +359,14 @@ export default function StudentPortal({ user, onLogout }) {
   const [mindMapUnit, setMindMapUnit] = useState("1");
   const [mindMapData, setMindMapData] = useState(null);
   const [mindMapLoading, setMindMapLoading] = useState(false);
+  const [mindMapError, setMindMapError] = useState("");
   const [nodeModal, setNodeModal] = useState({ isOpen: false, nodeLabel: "", action: "", content: "", loading: false });
 
   // Revision Notes state
   const [notesUnit, setNotesUnit] = useState("1");
   const [revisionNotesData, setRevisionNotesData] = useState(null);
   const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState("");
   const [copiedNotes, setCopiedNotes] = useState(false);
 
   // Adaptive Quiz state
@@ -359,6 +393,7 @@ export default function StudentPortal({ user, onLogout }) {
   const [mockExamTimeLeft, setMockExamTimeLeft] = useState(1200);
   const [mockExamLoading, setMockExamLoading] = useState(false);
   const [mockExamReport, setMockExamReport] = useState(null);
+  const [mockExamError, setMockExamError] = useState("");
 
 
 
@@ -427,15 +462,16 @@ export default function StudentPortal({ user, onLogout }) {
   }, [selectedFacultyId, loadProgress, loadGamification]);
 
   // ─── Mind Map Handler ───
-  const handleLoadMindMap = async (unitNum) => {
+  const handleLoadMindMap = async (unitNum, refresh = false) => {
     const targetUnit = unitNum || mindMapUnit;
     if (!selectedFacultyId || !targetUnit) return;
     setMindMapLoading(true);
+    setMindMapError("");
     try {
-      const data = await api.getMindMap(Number(targetUnit), selectedFacultyId);
+      const data = await api.getMindMap(Number(targetUnit), selectedFacultyId, refresh);
       setMindMapData(data);
     } catch (err) {
-      alert(err.message || "Could not generate Mind Map.");
+      setMindMapError(err.message || "Could not generate the mind map.");
     } finally {
       setMindMapLoading(false);
     }
@@ -445,10 +481,10 @@ export default function StudentPortal({ user, onLogout }) {
     setNodeModal((prev) => ({ ...prev, loading: true }));
     try {
       const promptText = `Regarding the syllabus concept '${nodeLabel}': ${userQuestion}`;
-      const res = await api.askQuestion(Number(mindMapUnit || 1), promptText, selectedFacultyId);
+      const res = await api.ask(promptText, "exam", selectedFacultyId, Number(mindMapUnit) || null);
       setNodeModal((prev) => ({
         ...prev,
-        content: prev.content + `\n\n---\n**Q:** ${userQuestion}\n\n**AI Answer:** ${res.answer}`,
+        content: prev.content + `\n\n---\n**Q:** ${userQuestion}\n\n${res.answer}`,
         loading: false,
       }));
     } catch (err) {
@@ -466,7 +502,7 @@ export default function StudentPortal({ user, onLogout }) {
         isOpen: true,
         nodeLabel,
         action: "ask",
-        content: `### 💬 Ask Syllabus AI about **${nodeLabel}**\n\nI can explain concepts, provide real-world examples, or break down formulas for **${nodeLabel}**. Ask your question below:`,
+        content: `### Ask about **${nodeLabel}**\n\nI can explain concepts, provide real-world examples, or break down formulas for **${nodeLabel}**. Ask your question below:`,
         loading: false,
       });
       return;
@@ -482,15 +518,16 @@ export default function StudentPortal({ user, onLogout }) {
   };
 
   // ─── Revision Notes Handler ───
-  const handleLoadNotes = async (unitNum) => {
+  const handleLoadNotes = async (unitNum, refresh = false) => {
     const targetUnit = unitNum || notesUnit;
     if (!selectedFacultyId || !targetUnit) return;
     setNotesLoading(true);
+    setNotesError("");
     try {
-      const data = await api.getRevisionNotes(Number(targetUnit), selectedFacultyId);
+      const data = await api.getRevisionNotes(Number(targetUnit), selectedFacultyId, refresh);
       setRevisionNotesData(data);
     } catch (err) {
-      alert(err.message || "Could not load revision notes.");
+      setNotesError(err.message || "Could not load revision notes.");
     } finally {
       setNotesLoading(false);
     }
@@ -573,12 +610,10 @@ export default function StudentPortal({ user, onLogout }) {
 
   // ─── Timed Mock Exam Handlers ───
   const handleStartMockExam = async () => {
-    if (mockExamSelectedUnits.length === 0 || !selectedFacultyId) {
-      alert("Please select at least one unit for the mock exam.");
-      return;
-    }
+    if (mockExamSelectedUnits.length === 0 || !selectedFacultyId) return;
     setMockExamLoading(true);
     setMockExamReport(null);
+    setMockExamError("");
     try {
       const data = await api.generateMockExam(
         mockExamSelectedUnits,
@@ -592,7 +627,7 @@ export default function StudentPortal({ user, onLogout }) {
       setMockExamTimeLeft(data.duration_minutes * 60);
       setMockExamActive(true);
     } catch (err) {
-      alert(err.message || "Could not generate mock exam.");
+      setMockExamError(err.message || "Could not generate the mock exam.");
     } finally {
       setMockExamLoading(false);
     }
@@ -612,6 +647,14 @@ export default function StudentPortal({ user, onLogout }) {
     return () => clearInterval(timer);
   }, [mockExamActive, mockExamTimeLeft]);
 
+  // Time's up: submit automatically (only once — submitting flips mockExamActive off)
+  useEffect(() => {
+    if (mockExamActive && mockExamTimeLeft === 0 && !mockExamLoading) {
+      handleFinalSubmitMockExam();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockExamActive, mockExamTimeLeft]);
+
   const handleFinalSubmitMockExam = async () => {
     if (!mockExamData || !selectedFacultyId) return;
     setMockExamLoading(true);
@@ -628,7 +671,7 @@ export default function StudentPortal({ user, onLogout }) {
       loadProgress(selectedFacultyId);
       loadGamification();
     } catch (err) {
-      alert(err.message || "Error submitting mock exam.");
+      setMockExamError(err.message || "Could not submit the exam. Your answers are still here; please try again.");
     } finally {
       setMockExamLoading(false);
     }
@@ -655,25 +698,29 @@ export default function StudentPortal({ user, onLogout }) {
     }
   };
 
-  const handleAsk = async (e) => {
-    e.preventDefault();
-    if (!query.trim() || !selectedFacultyId) return;
+  // `override` lets other pages (e.g. a revision-notes exam question) ask directly
+  const handleAsk = async (e, override = null) => {
+    e?.preventDefault();
+    const askText = override?.query ?? query;
+    const askUnit = override ? override.unit : qaUnitSelect;
+    const askSubtopic = override ? null : qaSubtopicSelect;
+    if (!askText.trim() || !selectedFacultyId) return;
     setLoading(true);
     setResult(null);
     try {
       const data = await api.ask(
-        query,
+        askText,
         mode,
         selectedFacultyId,
-        qaUnitSelect ? Number(qaUnitSelect) : null,
-        qaSubtopicSelect || null
+        askUnit ? Number(askUnit) : null,
+        askSubtopic || null
       );
       setResult(data);
-      setLastQuery(query);
+      setLastQuery(askText);
     } catch (err) {
       console.error(err);
       setResult({
-        answer: `⚠️ **Notice**: ${err.message || "Failed to query syllabus. Please make sure PDFs are uploaded for this course."}`,
+        answer: `**Notice**: ${err.message || "Failed to query syllabus. Please make sure PDFs are uploaded for this course."}`,
         citations: [],
         unit_number: null,
       });
@@ -827,7 +874,7 @@ export default function StudentPortal({ user, onLogout }) {
     } catch (err) {
       setNodeModal((prev) => ({
         ...prev,
-        content: `⚠️ Failed to fetch explanation: ${err.message}`,
+        content: `Failed to fetch explanation: ${err.message}`,
         loading: false,
       }));
     }
@@ -869,7 +916,7 @@ export default function StudentPortal({ user, onLogout }) {
       const data = await api.getUnitSummary(unitNumber, selectedFacultyId);
       setUnitSummary(data);
     } catch (err) {
-      setUnitSummary({ summary: `⚠️ ${err.message || "Could not generate summary."}`, unit_name: "", unit_number: unitNumber });
+      setUnitSummary({ summary: `${err.message || "Could not generate summary."}`, unit_name: "", unit_number: unitNumber });
     } finally {
       setSummaryLoading(false);
     }
@@ -899,11 +946,18 @@ export default function StudentPortal({ user, onLogout }) {
 
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-x-clip ${
       isDark ? "dark bg-surface-dark text-slate-100" : "bg-surface-secondary text-slate-800"
     }`}>
-      {/* 60 FPS HTML5 Canvas Background Particle Network */}
-      <NetworkCanvas isDark={isDark} />
+      {/* Soft static backdrop: a faint top glow instead of the animated particle network */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 top-0 h-[420px] ${
+          isDark
+            ? "bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.12),transparent_65%)]"
+            : "bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_65%)]"
+        }`}
+      />
 
       {/* Header */}
       <header className={`sticky top-0 px-4 lg:px-6 py-3 flex flex-wrap items-center justify-between gap-3 border-b transition-colors z-30 ${
@@ -982,16 +1036,18 @@ export default function StudentPortal({ user, onLogout }) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowHero(!showHero)}
+            onClick={() => {
+              setActiveTab("dashboard");
+              if (!showGuide) toggleGuide();
+            }}
+            title="Show the step-by-step student guide"
             className={`vce-btn vce-btn-sm ${
-              showHero
-                ? "bg-primary-600 text-white border-primary-500 shadow-sm"
-                : isDark
+              isDark
                 ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700"
                 : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
             }`}
           >
-            <Sparkles className="h-3.5 w-3.5" /> Hero
+            <HelpCircle className="h-3.5 w-3.5" /> How it works
           </button>
 
           {/* Light / Dark Mode Toggle */}
@@ -1010,27 +1066,85 @@ export default function StudentPortal({ user, onLogout }) {
         </div>
       </header>
 
-      {/* Opening Cinematic Hero Entrance */}
-      <AnimatePresence>
-        {showHero && (
-          <div className="p-6 max-w-7xl mx-auto w-full z-10">
-            <WorkspaceHero onEnterWorkspace={() => setShowHero(false)} isDark={isDark} />
-          </div>
-        )}
-      </AnimatePresence>
-
-      <div className={`flex-1 max-w-8xl w-full mx-auto px-4 lg:px-6 py-5 flex flex-col md:flex-row gap-5 z-10 ${showHero ? "hidden" : ""}`}>
+      <div className="flex-1 max-w-8xl w-full mx-auto px-4 lg:px-6 py-5 flex flex-col md:flex-row gap-5 z-10">
         {/* ─── Left Sidebar Navigation ─── */}
-        <aside className={`vce-sidebar ${
+        <aside className={`vce-sidebar max-md:!flex max-md:!flex-row max-md:gap-1 max-md:overflow-x-auto max-md:no-scrollbar max-md:!p-2 max-md:!space-y-0 ${
           isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""
         }`}>
-          {/* Section 1: Syllabus Units */}
-          <div>
+          {/* Section 1: Grouped Navigation */}
+          {[
+            {
+              group: "Learn",
+              tabs: [
+                { id: "dashboard", icon: Layers, label: "Dashboard", hint: "Your progress at a glance" },
+                { id: "study", icon: Brain, label: "Ask a Doubt", hint: "Answers only from your syllabus notes" },
+                { id: "mindmap", icon: Network, label: "Mind Maps", hint: "See how topics in a unit connect" },
+                { id: "notes", icon: BookMarked, label: "Revision Notes", hint: "Short notes for quick revision" },
+                { id: "quiz", icon: ClipboardList, label: "Quizzes", hint: "Practise and track your mastery" },
+                { id: "mock_exam", icon: Clock, label: "Mock Exams", hint: "Timed exam across several units" },
+              ],
+            },
+            {
+              group: "Progress",
+              tabs: [
+                { id: "insights", icon: Target, label: "Weak Topics & Plan", hint: "What to study next, and a study plan" },
+                { id: "history", icon: History, label: "My Questions", hint: "Every doubt you've asked so far" },
+              ],
+            },
+          ].map(({ group, tabs }) => (
+            <div key={group} className="contents md:block">
+              <h2 className={`hidden md:block text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
+                isDark ? "text-slate-500" : "text-slate-400"
+              }`}>
+                {group}
+              </h2>
+              <div className="contents md:block md:space-y-0.5">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      title={tab.hint}
+                      className={`flex-shrink-0 md:w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium whitespace-nowrap transition relative cursor-pointer ${
+                        isActive
+                          ? isDark
+                            ? "text-white font-semibold"
+                            : "text-primary-700 font-semibold"
+                          : isDark
+                          ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                          : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                      }`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="activeSidebarTabPill"
+                          className={`absolute inset-0 rounded-xl ${
+                            isDark ? "bg-primary-500/10 border border-primary-500/20" : "bg-primary-50 border border-primary-100"
+                          }`}
+                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                        />
+                      )}
+                      <Icon className={`w-4 h-4 z-10 transition-colors ${isActive ? (isDark ? "text-primary-400" : "text-primary-600") : ""}`} />
+                      <span className="z-10">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* Section 2: Syllabus Units */}
+          <div className="hidden md:block">
             <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
               isDark ? "text-slate-500" : "text-slate-400"
             }`}>
-              Syllabus Units
+              Your Units
             </h2>
+            <p className={`text-[11px] -mt-1.5 mb-2 px-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+              Click a unit to see its topics.
+            </p>
             <div className="space-y-1 max-h-56 overflow-y-auto pr-1 no-scrollbar">
               {units.length === 0 && (
                 <p className="text-xs opacity-50 italic">No units uploaded yet.</p>
@@ -1139,59 +1253,9 @@ export default function StudentPortal({ user, onLogout }) {
             </div>
           </div>
 
-          {/* Section 2: Sidebar Navigation Tabs */}
-          <div>
-            <h2 className={`text-[11px] font-semibold uppercase tracking-widest mb-2.5 px-1 ${
-              isDark ? "text-slate-500" : "text-slate-400"
-            }`}>
-              Navigation
-            </h2>
-            <div className="space-y-0.5">
-              {[
-                { id: "study", icon: Brain, label: "Study & Ask" },
-                { id: "mindmap", icon: Network, label: "Mind Maps" },
-                { id: "notes", icon: BookMarked, label: "Revision Notes" },
-                { id: "quiz", icon: ClipboardList, label: "Take Quiz" },
-                { id: "mock_exam", icon: Clock, label: "Mock Exam" },
-                { id: "insights", icon: Target, label: "AI Insights" },
-                { id: "history", icon: History, label: "Doubt History" },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-medium transition relative cursor-pointer ${
-                      isActive
-                        ? isDark
-                          ? "text-white font-semibold"
-                          : "text-primary-700 font-semibold"
-                        : isDark
-                        ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                    }`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeSidebarTabPill"
-                        className={`absolute inset-0 rounded-xl ${
-                          isDark ? "bg-primary-500/10 border border-primary-500/20" : "bg-primary-50 border border-primary-100"
-                        }`}
-                        transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                      />
-                    )}
-                    <Icon className={`w-4 h-4 z-10 transition-colors ${isActive ? (isDark ? "text-primary-400" : "text-primary-600") : ""}`} />
-                    <span className="z-10">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Section 3: Compact Progress Pill */}
-          <div className={`vce-divider ${isDark ? "!bg-slate-800" : ""}`} />
-          <div className={`p-3.5 rounded-xl border space-y-2 transition ${
+          <div className={`hidden md:block vce-divider ${isDark ? "!bg-slate-800" : ""}`} />
+          <div className={`hidden md:block p-3.5 rounded-xl border space-y-2 transition ${
             isDark ? "bg-slate-900/60 border-slate-800" : "bg-surface-tertiary border-slate-100"
           }`}>
             <div className="flex items-center justify-between text-xs">
@@ -1218,12 +1282,62 @@ export default function StudentPortal({ user, onLogout }) {
         </aside>
 
         {/* ─── Right Main Workspace (Focused Active View) ─── */}
-        <main className="flex-1 min-w-0 space-y-6">
+        <main className="flex-1 min-w-0">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-6"
+          >
+
+          {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
+          {activeTab === "dashboard" && (
+            <StudentDashboard
+              user={user}
+              units={safeUnits}
+              gamification={gamification}
+              facultyId={selectedFacultyId}
+              subjectName={facultyList.find((f) => f.id === selectedFacultyId)?.subject_name}
+              isDark={isDark}
+              showGuide={showGuide}
+              onToggleGuide={toggleGuide}
+              onNavigate={setActiveTab}
+              onStudyUnit={(unitNumber) => {
+                setActiveTab("study");
+                setQaUnitSelect(String(unitNumber));
+                setQaSubtopicSelect("");
+              }}
+              onQuizUnit={handleFullUnitQuiz}
+            />
+          )}
 
           {/* ═══════════════ STUDY TAB ═══════════════ */}
           {activeTab === "study" && (
             <>
               <div className={`vce-card p-5 ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}>
+                {/* Page header: what this page does, in plain words */}
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2 rounded-xl bg-primary-500/10 text-primary-500 border border-primary-500/20">
+                    <Brain className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className={`text-base font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
+                        {(() => {
+                          const u = units.find((x) => String(x.unit_number) === String(qaUnitSelect));
+                          return u ? `Unit ${u.unit_number} — ${u.unit_name}` : "Ask a Doubt";
+                        })()}
+                      </h2>
+                      <span className="vce-badge-success text-[10px]">
+                        <CheckCircle2 className="h-3 w-3" /> Syllabus-bound
+                      </span>
+                    </div>
+                    <p className={`text-xs mt-0.5 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                      Ask anything from your syllabus. Answers come only from your faculty's notes, with the page they came from.
+                    </p>
+                  </div>
+                </div>
                 <form onSubmit={handleAsk} className="space-y-4">
                   {/* Topic Filter Selector */}
                   <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl border ${
@@ -1233,7 +1347,7 @@ export default function StudentPortal({ user, onLogout }) {
                       <label className={`block text-xs font-medium mb-1.5 ${
                         isDark ? "text-slate-400" : "text-slate-500"
                       }`}>
-                        Target Unit
+                        Unit
                       </label>
                       <select
                         value={qaUnitSelect}
@@ -1245,7 +1359,7 @@ export default function StudentPortal({ user, onLogout }) {
                           isDark ? "bg-surface-dark border-slate-700 text-white" : ""
                         }`}
                       >
-                        <option value="">All Syllabus Units</option>
+                        <option value="">All units</option>
                         {units.map((u) => (
                           <option key={u.unit_number} value={u.unit_number}>
                             Unit {u.unit_number}: {u.unit_name}
@@ -1258,13 +1372,13 @@ export default function StudentPortal({ user, onLogout }) {
                       <label className={`block text-xs font-medium mb-1.5 ${
                         isDark ? "text-slate-400" : "text-slate-500"
                       }`}>
-                        Specific Subtopic
+                        Topic <span className="opacity-60">(optional)</span>
                       </label>
                       <input
                         type="text"
                         value={qaSubtopicSelect}
                         onChange={(e) => setQaSubtopicSelect(e.target.value)}
-                        placeholder="e.g. Stemming, CPU Scheduling..."
+                        placeholder="e.g. Stemming"
                         className={`vce-input text-xs ${
                           isDark ? "bg-surface-dark border-slate-700 text-white placeholder-slate-500" : ""
                         }`}
@@ -1276,21 +1390,54 @@ export default function StudentPortal({ user, onLogout }) {
                     <label className={`block text-sm font-semibold mb-1.5 ${
                       isDark ? "text-slate-200" : "text-slate-700"
                     }`}>
-                      Ask a Question
+                      Your question
                     </label>
                     <input
                       type="text"
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
-                      placeholder="e.g., Define Round Robin CPU Scheduling and its time quantum..."
+                      placeholder="Type your doubt, e.g. What is stemming? Give an example."
                       className={`vce-input ${
                         isDark ? "bg-surface-dark border-slate-700 text-white placeholder-slate-500" : ""
                       }`}
                     />
                   </div>
 
+                  {/* Starter questions — help students who don't know what to ask */}
+                  {!query && !result && (() => {
+                    const u = units.find((x) => String(x.unit_number) === String(qaUnitSelect));
+                    const topic = qaSubtopicSelect || (subtopicsCache[qaUnitSelect] || [])[0];
+                    const starters = u
+                      ? [
+                          `Explain the main ideas of ${u.unit_name} in simple words`,
+                          topic ? `What is ${topic}? Give an example.` : `What are the key topics in Unit ${u.unit_number}?`,
+                          `List the most important exam questions from Unit ${u.unit_number}`,
+                        ]
+                      : ["What are the key topics in this course?", "Explain the first unit in simple words"];
+                    return (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`text-[11px] font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>Try:</span>
+                        {starters.map((q) => (
+                          <button
+                            key={q}
+                            type="button"
+                            onClick={() => setQuery(q)}
+                            className={`text-[11px] px-2.5 py-1 rounded-full border transition cursor-pointer ${
+                              isDark
+                                ? "border-slate-700 text-slate-300 hover:border-primary-500/50 hover:text-white"
+                                : "border-slate-200 text-slate-600 hover:border-primary-300 hover:text-primary-700"
+                            }`}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className={`flex items-center p-0.5 rounded-lg border text-xs font-medium ${
+                    <div className="flex flex-col gap-1">
+                    <div className={`flex items-center p-0.5 rounded-lg border text-xs font-medium self-start ${
                       isDark ? "bg-slate-900 border-slate-800" : "bg-surface-tertiary border-slate-200"
                     }`}>
                       <button
@@ -1324,21 +1471,64 @@ export default function StudentPortal({ user, onLogout }) {
                         Analogy Mode
                       </button>
                     </div>
+                    <p className={`text-[11px] ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                      {mode === "exam"
+                        ? "Exam Mode: structured answer, written the way you'd answer in an exam."
+                        : "Analogy Mode: explained with everyday examples — best when a topic feels confusing."}
+                    </p>
+                    </div>
                     <button
                       type="submit"
                       disabled={loading}
                       className="vce-btn-primary vce-btn-sm"
                     >
                       {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      {loading ? "Searching..." : "Ask Syllabus AI"}
+                      {loading ? "Searching your notes..." : "Ask AI Tutor"}
                     </button>
                   </div>
                 </form>
               </div>
 
+              {/* Thinking state while the tutor reads the notes */}
+              {loading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`vce-card p-5 space-y-3 ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}
+                >
+                  <div className={`flex items-center gap-2 text-xs font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                    <span className="flex gap-1">
+                      {[0, 1, 2].map((d) => (
+                        <motion.span
+                          key={d}
+                          animate={{ y: [0, -4, 0] }}
+                          transition={{ duration: 0.6, repeat: Infinity, delay: d * 0.15 }}
+                          className="w-1.5 h-1.5 rounded-full bg-primary-500"
+                        />
+                      ))}
+                    </span>
+                    Reading your course notes…
+                  </div>
+                  {[92, 78, 85, 60].map((w, i) => (
+                    <div key={i} className={`h-3 rounded-full overflow-hidden ${isDark ? "bg-slate-800" : "bg-slate-100"}`} style={{ width: `${w}%` }}>
+                      <motion.div
+                        className={`h-full w-1/3 ${isDark ? "bg-slate-700" : "bg-slate-200"}`}
+                        animate={{ x: ["-100%", "300%"] }}
+                        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
+                      />
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+
               {/* Answer Card */}
-              {result && (
-                <div className={`vce-card overflow-hidden ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}>
+              {result && !loading && (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                  className={`vce-card overflow-hidden ${isDark ? "!bg-surface-dark-secondary !border-slate-800" : ""}`}
+                >
                   {/* Gradient accent bar */}
                   <div className="h-0.5 bg-gradient-to-r from-primary-500 via-accent-500 to-success-500" />
 
@@ -1346,25 +1536,28 @@ export default function StudentPortal({ user, onLogout }) {
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Sparkles className={`h-4 w-4 ${isDark ? "text-primary-400" : "text-primary-500"}`} />
+                        <BookOpen className={`h-4 w-4 ${isDark ? "text-primary-400" : "text-primary-500"}`} />
                         <span className={`text-xs font-semibold uppercase tracking-wider ${
                           isDark ? "text-slate-400" : "text-slate-500"
                         }`}>
-                          {mode === "analogy" ? "Analogy Explanation" : "Verified Answer"}
+                          {mode === "analogy" ? "Explained with an analogy" : "Answer from your syllabus"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {result.citations.map((c, i) => (
-                          <span
-                            key={i}
-                            className={`vce-badge-success text-[10px] ${
-                              isDark ? "" : ""
-                            }`}
-                          >
-                            <FileText className="h-3 w-3" /> Page {c.page} · {c.source}
-                          </span>
-                        ))}
-                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard?.writeText(result.answer).then(() => {
+                            setCopiedAnswer(true);
+                            setTimeout(() => setCopiedAnswer(false), 1500);
+                          });
+                        }}
+                        title="Copy answer"
+                        className={`vce-btn vce-btn-sm ${
+                          isDark ? "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700" : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {copiedAnswer ? <Check className="h-3.5 w-3.5 text-success-500" /> : <Copy className="h-3.5 w-3.5" />}
+                        {copiedAnswer ? "Copied" : "Copy"}
+                      </button>
                     </div>
 
                     {/* Markdown-rendered content with Formatted Math LaTeX */}
@@ -1385,7 +1578,7 @@ export default function StudentPortal({ user, onLogout }) {
                       }`}>
                         <span className={`text-[11px] font-medium ${
                           isDark ? "text-slate-500" : "text-slate-400"
-                        }`}>Re-explain:</span>
+                        }`}>Still unclear?</span>
                         <button
                           onClick={() => handleExplainAgain("simpler")}
                           disabled={explainLoading}
@@ -1396,7 +1589,7 @@ export default function StudentPortal({ user, onLogout }) {
                           } disabled:opacity-50`}
                         >
                           {explainLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                          Simpler
+                          Explain simpler
                         </button>
                         <button
                           onClick={() => handleExplainAgain("detailed")}
@@ -1413,25 +1606,41 @@ export default function StudentPortal({ user, onLogout }) {
                       </div>
                     )}
 
-                    {/* Source info footer */}
-                    {result.unit_number && (
-                      <div className={`pt-3 border-t ${
-                        isDark ? "border-slate-800" : "border-slate-100"
-                      }`}>
-                        <p className={`text-[11px] ${
-                          isDark ? "text-slate-500" : "text-slate-400"
-                        }`}>
-                          Sourced from Unit {result.unit_number} · Syllabus-verified response
+                    {/* Sources: the exact passages the answer was built from */}
+                    {result.citations?.length > 0 && (
+                      <div className={`pt-4 border-t ${isDark ? "border-slate-800" : "border-slate-100"}`}>
+                        <p className={`text-xs font-semibold mb-2.5 flex items-center gap-1.5 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                          <FileText className="h-3.5 w-3.5 text-success-500" /> Sources from your notes
                         </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {result.citations.map((c, i) => (
+                            <motion.div
+                              key={`${c.source}-${c.page}`}
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.15 + i * 0.07 }}
+                              className={`p-3 rounded-xl border text-left ${
+                                isDark ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className={`text-[11px] font-semibold truncate ${isDark ? "text-slate-300" : "text-slate-700"}`} title={c.source}>
+                                  {c.source.replace(/\.pdf$/i, "")}
+                                </span>
+                                <span className="vce-badge-success text-[10px] flex-shrink-0">Page {c.page}</span>
+                              </div>
+                              {c.snippet && (
+                                <p className={`text-[11px] leading-relaxed line-clamp-3 ${isDark ? "text-slate-500" : "text-slate-500"}`}>
+                                  "{c.snippet}"
+                                </p>
+                              )}
+                            </motion.div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
-
-              {/* Interactive RAG Vector Neural Flow Graph Visualizer */}
-              {result && (
-                <RAGNodeVisualizer citations={result.citations || []} query={query} isDark={isDark} />
+                </motion.div>
               )}
             </>
           )}
@@ -1450,10 +1659,10 @@ export default function StudentPortal({ user, onLogout }) {
                   </div>
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                      Interactive AI Mind Map
+                      Mind Map
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Visual syllabus knowledge tree. Click concept nodes for deep explanations, real-world examples, or micro-quizzes.
+                      Every topic in the unit and how they connect, built from your course notes. Click a topic to explain it, see an example or quiz yourself.
                     </p>
                   </div>
                 </div>
@@ -1473,15 +1682,22 @@ export default function StudentPortal({ user, onLogout }) {
                     ))}
                   </select>
                   <button
-                    onClick={() => handleLoadMindMap(mindMapUnit)}
+                    onClick={() => handleLoadMindMap(mindMapUnit, !!mindMapData)}
                     disabled={mindMapLoading}
+                    title={mindMapData ? "Rebuild this mind map from the latest notes" : undefined}
                     className="vce-btn vce-btn-primary vce-btn-sm"
                   >
                     {mindMapLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    {mindMapLoading ? "Generating..." : "Generate Mind Map"}
+                    {mindMapLoading ? "Reading notes..." : mindMapData ? "Regenerate" : "Generate Mind Map"}
                   </button>
                 </div>
               </div>
+
+              {mindMapError && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border text-xs font-medium bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {mindMapError}
+                </div>
+              )}
 
               {mindMapLoading ? (
                 <div
@@ -1493,7 +1709,7 @@ export default function StudentPortal({ user, onLogout }) {
                     <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                   <p className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                    Structuring syllabus topics into interactive tree...
+                    Reading the whole unit and mapping its topics...
                   </p>
                   <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto overflow-hidden">
                     <div className="h-full bg-primary-600 rounded-full animate-pulse" style={{ width: "70%" }} />
@@ -1550,10 +1766,10 @@ export default function StudentPortal({ user, onLogout }) {
                   </div>
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                      AI Syllabus Revision Notes
+                      Revision Notes
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      High-yield exam points, key definitions, formulas, and expected questions generated from PDF context.
+                      A section-by-section summary of your course notes, with page numbers, key definitions and likely exam questions.
                     </p>
                   </div>
                 </div>
@@ -1573,15 +1789,22 @@ export default function StudentPortal({ user, onLogout }) {
                     ))}
                   </select>
                   <button
-                    onClick={() => handleLoadNotes(notesUnit)}
+                    onClick={() => handleLoadNotes(notesUnit, !!revisionNotesData)}
                     disabled={notesLoading}
+                    title={revisionNotesData ? "Rewrite these notes from the latest course material" : undefined}
                     className="vce-btn vce-btn-primary vce-btn-sm"
                   >
-                    {notesLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    {notesLoading ? "Generating..." : "Generate Notes"}
+                    {notesLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                    {notesLoading ? "Reading notes..." : revisionNotesData ? "Regenerate" : "Generate Notes"}
                   </button>
                 </div>
               </div>
+
+              {notesError && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border text-xs font-medium bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" /> {notesError}
+                </div>
+              )}
 
               {notesLoading ? (
                 <div
@@ -1604,6 +1827,13 @@ export default function StudentPortal({ user, onLogout }) {
                   notesData={revisionNotesData}
                   isDark={isDark}
                   markdownComponents={markdownComponents}
+                  onAskQuestion={(q, unitNumber) => {
+                    setActiveTab("study");
+                    setQuery(q);
+                    setQaUnitSelect(String(unitNumber));
+                    setQaSubtopicSelect("");
+                    handleAsk(null, { query: q, unit: String(unitNumber) });
+                  }}
                 />
               ) : (
                 <div
@@ -1635,225 +1865,36 @@ export default function StudentPortal({ user, onLogout }) {
 
           {/* ═══════════════ MOCK EXAM TAB ═══════════════ */}
           {activeTab === "mock_exam" && (
-            <div className="space-y-6">
-              {!mockExamActive && !mockExamReport && (
-                <div className={`p-6 rounded-2xl border space-y-5 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
-                  <div className="text-center space-y-2">
-                    <Clock className="h-10 w-10 text-amber-500 mx-auto animate-pulse" />
-                    <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Timed AI Mock Exam Simulator</h3>
-                    <p className={`text-sm max-w-md mx-auto ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                      Simulate actual examination conditions across multiple units with live timer and per-unit score analysis.
-                    </p>
-                  </div>
-
-                  <div className={`max-w-xl mx-auto space-y-4 p-5 rounded-xl border ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
-                    <div>
-                      <label className={`block text-xs font-bold mb-2 ${isDark ? "text-slate-300" : "text-slate-700"}`}>Select Examination Units:</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {units.map((u) => (
-                          <label key={u.unit_number} className={`flex items-center gap-2 text-xs p-2 rounded-lg border cursor-pointer ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800"}`}>
-                            <input
-                              type="checkbox"
-                              checked={mockExamSelectedUnits.includes(u.unit_number)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setMockExamSelectedUnits((prev) => [...prev, u.unit_number]);
-                                } else {
-                                  setMockExamSelectedUnits((prev) => prev.filter((id) => id !== u.unit_number));
-                                }
-                              }}
-                              className="rounded text-amber-600 focus:ring-amber-500"
-                            />
-                            <span>Unit {u.unit_number}: {u.unit_name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-700"}`}>Duration (Minutes):</label>
-                        <select
-                          value={mockExamDuration}
-                          onChange={(e) => setMockExamDuration(Number(e.target.value))}
-                          className={`w-full border rounded-lg p-2 text-xs font-semibold outline-none ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
-                        >
-                          <option value={10}>10 Minutes</option>
-                          <option value={20}>20 Minutes</option>
-                          <option value={30}>30 Minutes</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">Total Questions:</label>
-                        <select
-                          value={mockExamNumQuestions}
-                          onChange={(e) => setMockExamNumQuestions(Number(e.target.value))}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-semibold"
-                        >
-                          <option value={10}>10 Questions</option>
-                          <option value={15}>15 Questions</option>
-                          <option value={20}>20 Questions</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={handleStartMockExam}
-                      disabled={mockExamLoading || mockExamSelectedUnits.length === 0}
-                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-700 shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {mockExamLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
-                      {mockExamLoading ? "Generating Exam Questions..." : "Start Timed Mock Exam"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Active Exam Interface */}
-              {mockExamActive && mockExamData && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-md p-6 space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200">
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-base">Timed Mock Examination</h3>
-                      <p className="text-xs text-slate-500">Question {mockExamCurrentIndex + 1} of {mockExamData.questions.length}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-300 px-4 py-2 rounded-xl text-amber-900 font-mono font-bold text-sm">
-                      <Clock className="h-4 w-4 text-amber-600 animate-pulse" />
-                      Time Left: {Math.floor(mockExamTimeLeft / 60)}:{(mockExamTimeLeft % 60).toString().padStart(2, "0")}
-                    </div>
-                  </div>
-
-                  {/* Question Cards */}
-                  {mockExamData.questions[mockExamCurrentIndex] && (
-                    <div className="space-y-4">
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                          Unit {mockExamData.questions[mockExamCurrentIndex].unit_number}
-                        </span>
-                        <h4 className="font-bold text-slate-900 text-sm mt-2">
-                          Q{mockExamCurrentIndex + 1}. {mockExamData.questions[mockExamCurrentIndex].question}
-                        </h4>
-                      </div>
-
-                      <div className="space-y-2">
-                        {mockExamData.questions[mockExamCurrentIndex].options.map((opt, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setMockExamAnswers((prev) => ({
-                                ...prev,
-                                [mockExamData.questions[mockExamCurrentIndex].id]: opt,
-                              }));
-                            }}
-                            className={`w-full text-left p-3.5 rounded-xl border text-xs font-semibold transition flex items-center justify-between cursor-pointer ${
-                              mockExamAnswers[mockExamData.questions[mockExamCurrentIndex].id] === opt
-                                ? "bg-amber-50 border-amber-400 text-amber-900 shadow-xs"
-                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            <span>{opt}</span>
-                            {mockExamAnswers[mockExamData.questions[mockExamCurrentIndex].id] === opt && (
-                              <CheckCircle2 className="h-4 w-4 text-amber-600" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Navigator Footer */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
-                    <button
-                      onClick={() => setMockExamCurrentIndex((prev) => Math.max(0, prev - 1))}
-                      disabled={mockExamCurrentIndex === 0}
-                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold disabled:opacity-40 cursor-pointer"
-                    >
-                      Previous
-                    </button>
-
-                    <div className="flex gap-1 overflow-x-auto max-w-xs py-1">
-                      {mockExamData.questions.map((q, idx) => (
-                        <button
-                          key={q.id}
-                          onClick={() => setMockExamCurrentIndex(idx)}
-                          className={`w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                            mockExamCurrentIndex === idx
-                              ? "bg-amber-600 text-white"
-                              : mockExamAnswers[q.id]
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {idx + 1}
-                        </button>
-                      ))}
-                    </div>
-
-                    {mockExamCurrentIndex < mockExamData.questions.length - 1 ? (
-                      <button
-                        onClick={() => setMockExamCurrentIndex((prev) => prev + 1)}
-                        className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition cursor-pointer"
-                      >
-                        Next
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleFinalSubmitMockExam}
-                        className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 shadow-sm transition cursor-pointer"
-                      >
-                        Submit Mock Exam
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* End of Exam Report */}
-              {mockExamReport && (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-md space-y-6">
-                  <div className="text-center space-y-2 pb-4 border-b border-slate-200">
-                    <Trophy className={`h-12 w-12 mx-auto ${mockExamReport.passed ? "text-amber-500" : "text-slate-400"}`} />
-                    <h3 className="text-xl font-bold text-slate-900">Mock Exam Results Report</h3>
-                    <p className="text-sm font-semibold text-slate-600">
-                      Overall Score: <span className={mockExamReport.passed ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>{mockExamReport.score_percent}%</span> ({mockExamReport.correct_count} / {mockExamReport.total_questions})
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
-                    💡 <strong>AI Feedback:</strong> {mockExamReport.ai_feedback}
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">Per-Unit Performance Breakdown</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {mockExamReport.unit_breakdown.map((ub) => (
-                        <div key={ub.unit_number} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                          <div>
-                            <span className="font-bold text-xs text-slate-800">Unit {ub.unit_number}</span>
-                            <p className="text-[10px] text-slate-500">{ub.correct} of {ub.total} correct</p>
-                          </div>
-                          <span className={`text-xs font-bold px-2 py-1 rounded-md ${ub.score_percent >= 60 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                            {ub.score_percent}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setMockExamReport(null);
-                      setMockExamActive(false);
-                    }}
-                    className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition cursor-pointer"
-                  >
-                    Close Exam Report
-                  </button>
-                </div>
-              )}
-            </div>
+            <TimedMockExamView
+              mockExamActive={mockExamActive}
+              mockExamReport={mockExamReport}
+              mockExamSelectedUnits={mockExamSelectedUnits}
+              setMockExamSelectedUnits={setMockExamSelectedUnits}
+              mockExamDuration={mockExamDuration}
+              setMockExamDuration={setMockExamDuration}
+              mockExamNumQuestions={mockExamNumQuestions}
+              setMockExamNumQuestions={setMockExamNumQuestions}
+              units={indexedUnits}
+              mockExamLoading={mockExamLoading}
+              mockExamError={mockExamError}
+              handleStartMockExam={handleStartMockExam}
+              mockExamData={mockExamData}
+              mockExamCurrentIndex={mockExamCurrentIndex}
+              setMockExamCurrentIndex={setMockExamCurrentIndex}
+              mockExamAnswers={mockExamAnswers}
+              setMockExamAnswers={setMockExamAnswers}
+              mockExamTimeLeft={mockExamTimeLeft}
+              handleFinalSubmitMockExam={handleFinalSubmitMockExam}
+              setMockExamReport={setMockExamReport}
+              setMockExamActive={setMockExamActive}
+              onReviseUnit={(unitNumber) => {
+                setNotesUnit(String(unitNumber));
+                setActiveTab("notes");
+                handleLoadNotes(String(unitNumber));
+              }}
+              onPracticeUnit={handleFullUnitQuiz}
+              isDark={isDark}
+            />
           )}
 
           {/* ═══════════════ QUIZ TAB ═══════════════ */}
@@ -1898,11 +1939,11 @@ export default function StudentPortal({ user, onLogout }) {
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
                     <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-indigo-400 animate-pulse" />
-                      AI Learner Intelligence Dashboard
+                      <Target className="h-5 w-5 text-indigo-400" />
+                      Weak Topics & Study Plan
                     </h2>
                     <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                      Real-time topic mastery, weak-topic detection, and evidence-grounded study planner
+                      Worked out from your quiz answers: what you know well, what needs work, and what to study next
                     </p>
                   </div>
                   <button
@@ -1911,7 +1952,7 @@ export default function StudentPortal({ user, onLogout }) {
                     className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/80 px-3.5 py-2 rounded-xl border border-indigo-800 transition disabled:opacity-50"
                   >
                     {insightsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    {insightsLoading ? "Analyzing..." : "Refresh Intelligence"}
+                    {insightsLoading ? "Updating..." : "Refresh"}
                   </button>
                 </div>
 
@@ -1983,7 +2024,7 @@ export default function StudentPortal({ user, onLogout }) {
 
                     <div className={`p-4 rounded-xl border flex flex-col justify-center ${isDark ? "bg-purple-950/30 border-purple-900/50" : "bg-purple-50 border-purple-100"}`}>
                       <span className="text-2xl font-extrabold text-purple-400">{insightsData.overview.xp} <span className="text-xs text-purple-300">XP</span></span>
-                      <span className="text-[11px] font-semibold text-purple-400/80 uppercase tracking-wider mt-1">🔥 {insightsData.overview.streak_days} Day Streak</span>
+                      <span className="text-[11px] font-semibold text-purple-400/80 uppercase tracking-wider mt-1">{insightsData.overview.streak_days} Day Streak</span>
                     </div>
                   </div>
                 )}
@@ -1993,7 +2034,7 @@ export default function StudentPortal({ user, onLogout }) {
               {insightsData?.recommendations && insightsData.recommendations.length > 0 && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-indigo-400" /> Evidence-Based Recommendations
+                    <Lightbulb className="h-4 w-4 text-indigo-400" /> Recommendations
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
                     {insightsData.recommendations.map((rec, i) => (
@@ -2234,7 +2275,7 @@ export default function StudentPortal({ user, onLogout }) {
                     {/* AI Grounded Advice */}
                     <div className="p-4 bg-indigo-950/40 rounded-xl border border-indigo-800 text-indigo-200">
                       <p className="text-xs font-bold text-indigo-400 mb-1 flex items-center gap-1.5">
-                        <Sparkles className="h-3.5 w-3.5" /> Grounded Syllabus Study Tip
+                        <Lightbulb className="h-3.5 w-3.5" /> Study tip
                       </p>
                       <p className="text-sm text-indigo-100 leading-relaxed">{studyPlan.ai_advice}</p>
                     </div>
@@ -2473,6 +2514,7 @@ export default function StudentPortal({ user, onLogout }) {
               </div>
             </div>
           )}
+          </motion.div>
         </main>
       </div>
 

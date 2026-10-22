@@ -26,6 +26,7 @@ subjects never mix. Students are enrolled under a specific faculty at signup.
 
 import os
 import json
+import re
 import shutil
 from collections import Counter
 from datetime import datetime, timedelta
@@ -45,6 +46,7 @@ from database import Base, engine, get_db
 import models
 import schemas
 from ingestion import ingest_pdf, get_faculty_db_dir
+from retrieval import hybrid_search, format_sources, unit_digest, clear_cache as clear_retrieval_cache
 from auth import hash_password, verify_password, create_access_token, get_current_user, require_role
 
 load_dotenv()
@@ -68,6 +70,11 @@ import time as _time
 from langchain_openai import ChatOpenAI
 
 FALLBACK_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+
+# Each attempt is capped so a rate-limited provider fails over quickly instead of the
+# client's built-in exponential retries (up to 6) stalling the request for minutes.
+LLM_TIMEOUT_SECONDS = 75
+LLM_MAX_RETRIES = 1
 OPENROUTER_FREE_MODELS = [
     "openrouter/free",
     "google/gemma-4-31b-it:free",
@@ -93,7 +100,8 @@ def safe_llm_invoke(messages):
     api_keys = get_api_keys()
     for key in api_keys:
         try:
-            kwargs = {"model": "gemini-3.6-flash", "temperature": 0.2}
+            kwargs = {"model": "gemini-3.6-flash", "temperature": 0.2,
+                      "timeout": LLM_TIMEOUT_SECONDS, "max_retries": LLM_MAX_RETRIES}
             if key:
                 kwargs["google_api_key"] = key
             current_llm = ChatGoogleGenerativeAI(**kwargs)
@@ -116,6 +124,8 @@ def safe_llm_invoke(messages):
                     base_url="https://openrouter.ai/api/v1",
                     model=or_model,
                     temperature=0.2,
+                    timeout=LLM_TIMEOUT_SECONDS,
+                    max_retries=LLM_MAX_RETRIES,
                 )
                 print(f"🚀 Directly invoking OpenRouter model: {or_model}...")
                 return current_llm.invoke(messages)
@@ -127,7 +137,8 @@ def safe_llm_invoke(messages):
     # 3. Fallback: Secondary Gemini model (gemini-2.5-flash)
     for key in api_keys:
         try:
-            kwargs = {"model": "gemini-2.5-flash", "temperature": 0.2}
+            kwargs = {"model": "gemini-2.5-flash", "temperature": 0.2,
+                      "timeout": LLM_TIMEOUT_SECONDS, "max_retries": LLM_MAX_RETRIES}
             if key:
                 kwargs["google_api_key"] = key
             current_llm = ChatGoogleGenerativeAI(**kwargs)
@@ -219,6 +230,92 @@ def get_vector_store(faculty_id: int):
     return Chroma(persist_directory=db_dir, embedding_function=embeddings)
 
 
+def build_citations(docs, limit: int = 4) -> List[schemas.Citation]:
+    """One citation per distinct (file, page), with a short excerpt so students can check the source."""
+    seen, out = set(), []
+    for d in docs:
+        page = int(d.metadata.get("page", 0) or 0) + 1
+        src = d.metadata.get("source_file", "Course notes")
+        if (src, page) in seen:
+            continue
+        seen.add((src, page))
+        excerpt = " ".join(d.page_content.split())
+        out.append(schemas.Citation(
+            source=src,
+            page=page,
+            unit=d.metadata.get("unit", 1),
+            snippet=(excerpt[:220] + "…") if len(excerpt) > 220 else excerpt,
+        ))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def parse_llm_json(text: str):
+    """Parse JSON from an LLM reply, tolerating code fences and leading/trailing prose."""
+    raw = (text or "").strip().replace("```json", "```")
+    if "```" in raw:
+        raw = raw.split("```")[1] if raw.count("```") >= 2 else raw.replace("```", "")
+    raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        starts = [i for i in (raw.find("["), raw.find("{")) if i != -1]
+        if not starts:
+            raise
+        start = min(starts)
+        end = max(raw.rfind("]"), raw.rfind("}"))
+        return json.loads(raw[start:end + 1])
+
+
+_OPTION_PREFIX = re.compile(r"^\s*(?:option\s*)?\(?([a-dA-D])[\).:\-]\s+")
+
+
+def normalize_mcq(options, answer) -> Optional[str]:
+    """
+    Map the model's 'correct answer' onto the exact option text the student clicks.
+    Models often answer "B", "Option B", "B) ..." or a lightly reworded option, which
+    would otherwise mark every correct student answer as wrong. Returns None if no
+    option can be matched (the question is then dropped).
+    """
+    if not isinstance(options, list) or len(options) < 2 or answer is None:
+        return None
+    options = [str(o) for o in options]
+    ans = str(answer).strip()
+
+    def bare(t):
+        return re.sub(r"\s+", " ", _OPTION_PREFIX.sub("", t)).strip().lower().rstrip(".")
+
+    for o in options:
+        if o.strip() == ans:
+            return o
+    letter = re.fullmatch(r"(?:option\s*)?\(?([a-dA-D])\)?\.?", ans, flags=re.I)
+    if letter:
+        idx = "abcd".index(letter.group(1).lower())
+        return options[idx] if idx < len(options) else None
+    for o in options:
+        if bare(o) == bare(ans):
+            return o
+    prefixed = _OPTION_PREFIX.match(ans)
+    if prefixed:
+        idx = "abcd".index(prefixed.group(1).lower())
+        if idx < len(options):
+            return options[idx]
+    hits = [o for o in options if bare(ans) and (bare(ans) in bare(o) or bare(o) in bare(ans))]
+    return hits[0] if len(hits) == 1 else None
+
+
+GROUNDING_RULES = (
+    "Rules:\n"
+    "- Use ONLY the numbered sources below. They are the student's own course notes.\n"
+    "- Keep the notes' own terminology and definitions; do not swap in textbook definitions from memory.\n"
+    "- If the sources do not contain the answer, say clearly: \"Your course notes don't cover this part.\" "
+    "and then share only what the notes do say.\n"
+    "- Refer to sources inline like (p. 14) using the page numbers given.\n"
+    "- Format with short Markdown headings or bullet points. No emojis.\n"
+)
+
+
 def majority_unit(docs) -> Optional[int]:
     units = [d.metadata.get("unit") for d in docs if d.metadata.get("unit") is not None]
     if not units:
@@ -226,7 +323,6 @@ def majority_unit(docs) -> Optional[int]:
     return Counter(units).most_common(1)[0][0]
 
 
-import re
 
 
 def suggest_unit_name(file_path: str) -> str:
@@ -552,22 +648,22 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
     if req.unit_number is not None:
         filter_dict = {"unit": int(req.unit_number)}
     
-    # Prepend subtopic to vector query for high-precision semantic matching
+    # Prepend subtopic to the search query for high-precision matching
     semantic_query = req.query
     if req.subtopic and req.subtopic.strip():
-        semantic_query = f"Topic: {req.subtopic.strip()} - Question: {req.query}"
-        
-    # Syllabus-bound similarity score guardrail
-    results = store.similarity_search_with_relevance_scores(
+        semantic_query = f"{req.subtopic.strip()}: {req.query}"
+
+    # Hybrid (vector + keyword) retrieval; vector score drives the syllabus-bound guardrail
+    docs, top_score = hybrid_search(
+        store,
         semantic_query,
-        k=4,
-        filter=filter_dict,
+        unit_number=int(req.unit_number) if req.unit_number is not None else None,
+        k=6,
     )
 
     SIMILARITY_THRESHOLD = 0.40  # Defensible relevance threshold for out-of-syllabus guardrail
-    top_score = float(results[0][1]) if results else 0.0
 
-    if not results or top_score < SIMILARITY_THRESHOLD:
+    if not docs or top_score < SIMILARITY_THRESHOLD:
         rejected_answer = "This topic is outside the uploaded syllabus boundaries."
         # Audit trail logged in DoubtHistory
         try:
@@ -593,32 +689,21 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
             top_similarity=round(top_score, 4),
         )
 
-    # Filter context chunks by threshold
-    docs = [doc for doc, score in results if score >= SIMILARITY_THRESHOLD]
-    if not docs:
-        docs = [results[0][0]]
-
-    context = "\n\n".join([d.page_content for d in docs])
-    citations = [
-        schemas.Citation(
-            source=d.metadata.get("source_file", "Textbook"),
-            page=d.metadata.get("page", 0) + 1,
-            unit=d.metadata.get("unit", 1),
-        )
-        for d in docs
-    ]
+    sources = format_sources(docs)
+    citations = build_citations(docs)
 
     if req.mode == "analogy":
         system_instruction = (
-            "You are a helpful virtual tutor. Explain the following student query using intuitive, "
-            "everyday analogies while remaining strictly faithful to the provided textbook context.\n\n"
-            f"Context:\n{context}"
+            "You are a friendly tutor. First give the answer as the course notes state it (2-4 sentences), "
+            "then explain it with one everyday analogy a student can relate to, and end with how the analogy "
+            "maps back to the concept.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
     else:
         system_instruction = (
-            "You are a strict university examination evaluator. Provide a technically precise, concise, "
-            "and syllabus-compliant answer based EXCLUSIVELY on the context below. Do not guess or extrapolate.\n\n"
-            f"Context:\n{context}"
+            "You are a university tutor writing an exam-ready answer. Structure it as: a one-line definition, "
+            "the key points as bullets, and an example if the notes give one. Be precise and concise.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
 
     response = safe_llm_invoke([
@@ -638,7 +723,7 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
             query=req.query,
             mode=req.mode,
             answer=answer_text,
-            citations_json=json.dumps([c.dict() for c in citations[:2]]),
+            citations_json=json.dumps([c.dict() for c in citations]),
             top_similarity=round(top_score, 4),
         )
         db.add(doubt)
@@ -648,7 +733,7 @@ def ask_question(req: schemas.AskRequest, db: Session = Depends(get_db), user: m
 
     return schemas.AskResponse(
         answer=answer_text,
-        citations=citations[:2],
+        citations=citations,
         unit_number=resolved_unit,
         top_similarity=round(top_score, 4),
     )
@@ -679,20 +764,16 @@ def generate_micro_quiz(
 
     # Retrieve more chunks for larger quizzes
     k = min(5 + (num_q // 2), 25)
-    if unit_number:
-        docs = store.similarity_search(search_query, k=k, filter={"unit": unit_number})
-    else:
-        retriever = store.as_retriever(search_kwargs={"k": k})
-        docs = retriever.invoke(search_query)
-
-    context = "\n".join([d.page_content for d in docs])
+    docs, _ = hybrid_search(store, search_query, unit_number=unit_number, k=max(k, 6))
+    context = format_sources(docs)
     resolved_unit = unit_number or majority_unit(docs)
 
     quiz_prompt = (
         f"Generate exactly {num_q} syllabus-aligned multiple choice questions strictly based on the context below. "
+        "Use only facts stated in the sources; vary the questions across different points.\n"
         "Return ONLY a JSON array with objects containing 'question', 'options' (array of 4 strings), "
-        "and 'answer' (exact string matching the correct option).\n\n"
-        f"Context:\n{context}"
+        "'answer' (exact string matching the correct option) and 'explanation' (one sentence citing the page).\n\n"
+        f"Sources:\n{context}"
     )
 
     response = safe_llm_invoke([
@@ -701,10 +782,16 @@ def generate_micro_quiz(
     ])
 
     try:
-        clean_content = extract_text(response).strip().replace("```json", "").replace("```", "")
-        quiz_data = json.loads(clean_content)
+        raw_items = parse_llm_json(extract_text(response))
     except Exception:
-        quiz_data = []
+        raw_items = []
+    quiz_data = []
+    for item in raw_items if isinstance(raw_items, list) else []:
+        answer = normalize_mcq(item.get("options"), item.get("answer") or item.get("correct_answer"))
+        if item.get("question") and answer:
+            quiz_data.append({**item, "answer": answer})
+    if not quiz_data:
+        raise HTTPException(status_code=503, detail="Couldn't create quiz questions right now (AI service busy). Please try again.")
 
     return schemas.QuizResponse(unit_number=resolved_unit, quizzes=quiz_data)
 
@@ -813,6 +900,13 @@ def upload_document(
 
     try:
         chunk_count = ingest_pdf(dest_path, unit_number=resolved_number, unit_name=resolved_name, faculty_id=fid, source_filename=file.filename)
+        # New material: previously generated mind maps / notes for this unit are now stale
+        for cache_model in (models.MindMapCache, models.RevisionNotesCache):
+            db.query(cache_model).filter(
+                cache_model.faculty_id == fid, cache_model.unit_number == resolved_number
+            ).delete()
+        db.commit()
+        clear_retrieval_cache()
         doc.status = "indexed" if chunk_count > 0 else "failed"
         doc.chunk_count = chunk_count
     except Exception as e:
@@ -1367,8 +1461,7 @@ def explain_again(
 ):
     fid = _resolve_faculty_id(user, req.faculty_id)
     store = get_vector_store(fid)
-    retriever = store.as_retriever(search_kwargs={"k": 3})
-    docs = retriever.invoke(req.query)
+    docs, _ = hybrid_search(store, req.query, k=5)
 
     if not docs:
         return schemas.AskResponse(
@@ -1377,28 +1470,20 @@ def explain_again(
             unit_number=None,
         )
 
-    context = "\n\n".join([d.page_content for d in docs])
-    citations = [
-        schemas.Citation(
-            source=d.metadata.get("source_file", "Textbook"),
-            page=d.metadata.get("page", 0) + 1,
-            unit=d.metadata.get("unit", 1),
-        )
-        for d in docs
-    ]
+    sources = format_sources(docs)
+    citations = build_citations(docs)
 
     if req.style == "simpler":
         system_instruction = (
-            "You are a patient tutor. Explain the following concept in the simplest possible way, "
-            "as if teaching a complete beginner. Use everyday analogies and avoid jargon. "
-            "Keep it concise but thorough.\n\n"
-            f"Context:\n{context}"
+            "You are a patient tutor. Explain the concept in the simplest possible way, as if teaching a "
+            "beginner. Use short sentences and one everyday analogy, but keep the notes' definitions.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
     else:
         system_instruction = (
-            "You are an expert tutor. Provide a detailed, in-depth explanation with examples, "
-            "edge cases, and technical depth. Include diagrams described in text if helpful.\n\n"
-            f"Context:\n{context}"
+            "You are an expert tutor. Give a detailed explanation covering every point the notes make on this "
+            "topic, with the examples the notes give.\n\n"
+            f"{GROUNDING_RULES}\nSources:\n{sources}"
         )
 
     response = safe_llm_invoke([
@@ -1417,7 +1502,7 @@ def explain_again(
             query=f"[{req.style}] {req.query}",
             mode=req.style,
             answer=answer_text,
-            citations_json=json.dumps([c.dict() for c in citations[:2]]),
+            citations_json=json.dumps([c.dict() for c in citations]),
         )
         db.add(doubt)
         db.commit()
@@ -1426,7 +1511,7 @@ def explain_again(
 
     return schemas.AskResponse(
         answer=answer_text,
-        citations=citations[:2],
+        citations=citations,
         unit_number=majority_unit(docs),
     )
 
@@ -1730,6 +1815,7 @@ def delete_admin_user(
 def get_unit_mindmap(
     unit_number: int,
     faculty_id: Optional[int] = None,
+    refresh: bool = False,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
@@ -1740,11 +1826,12 @@ def get_unit_mindmap(
     ).first()
     unit_name = unit.unit_name if unit else f"Unit {unit_number}"
 
-    # 1. Check DB Cache
-    cached_entry = db.query(models.MindMapCache).filter(
+    # 1. Check DB Cache (refresh=true skips it; the old copy is only replaced once a new one succeeds)
+    cache_q = db.query(models.MindMapCache).filter(
         models.MindMapCache.faculty_id == fid,
         models.MindMapCache.unit_number == unit_number
-    ).first()
+    )
+    cached_entry = None if refresh else cache_q.first()
 
     if cached_entry:
         try:
@@ -1758,17 +1845,17 @@ def get_unit_mindmap(
         except Exception:
             pass
 
-    # 2. Fetch unit vector store context
+    # 2. Read the whole unit in page order (not a handful of chunks) so the map mirrors the notes
     store = get_vector_store(fid)
-    docs = store.similarity_search(f"Unit {unit_number} topics key concepts overview", filter={"unit": unit_number}, k=6)
-    if not docs:
-        docs = store.similarity_search(f"Unit {unit_number} key concepts", k=4)
-
-    context = "\n\n".join([d.page_content for d in docs]) if docs else "Overview of unit topics."
+    context = unit_digest(store, unit_number, max_chars=28000) or "Overview of unit topics."
 
     prompt = (
-        f"Analyze the syllabus context for Unit {unit_number}: '{unit_name}'.\n"
-        "Generate a structured hierarchical JSON tree representing the core mind map for this unit.\n"
+        f"Below are the complete lecture notes for Unit {unit_number}: '{unit_name}', in page order.\n"
+        "Build a mind map of THIS unit as the notes teach it:\n"
+        "- Main branches = the major sections/headings of the notes, in the order they appear (4-8 branches).\n"
+        "- Children = the sub-points, types, steps or examples the notes list under that section (2-6 each).\n"
+        "- Use the exact terms the notes use. Do NOT add topics that are not in the notes.\n"
+        "- Each description is one short sentence taken from what the notes say, ending with its page like (p. 7).\n"
         "Return ONLY a valid JSON object matching this exact schema:\n"
         "{\n"
         '  "id": "root",\n'
@@ -1785,7 +1872,7 @@ def get_unit_mindmap(
         '    }\n'
         '  ]\n'
         "}\n\n"
-        f"Syllabus Context:\n{context[:3000]}"
+        f"Lecture notes:\n{context}"
     )
 
     try:
@@ -1800,8 +1887,12 @@ def get_unit_mindmap(
                 raw_text = raw_text[4:]
             raw_text = raw_text.strip()
         tree_data = json.loads(raw_text)
+        generated = True
     except Exception:
-        # Fallback tree structure if JSON parsing fails
+        generated = False
+        if refresh and cache_q.first():
+            raise HTTPException(status_code=503, detail="Couldn't rebuild the mind map right now (AI service busy). Your previous mind map is kept.")
+        # Fallback tree structure if JSON parsing fails (shown, but never cached)
         tree_data = {
             "id": "root",
             "label": unit_name,
@@ -1813,14 +1904,15 @@ def get_unit_mindmap(
             ]
         }
 
-    # Save to Cache
-    new_cache = models.MindMapCache(
-        faculty_id=fid,
-        unit_number=unit_number,
-        mindmap_json=json.dumps(tree_data)
-    )
-    db.add(new_cache)
-    db.commit()
+    # Save to Cache, replacing any older copy
+    if generated:
+        cache_q.delete()
+        db.add(models.MindMapCache(
+            faculty_id=fid,
+            unit_number=unit_number,
+            mindmap_json=json.dumps(tree_data)
+        ))
+        db.commit()
 
     return schemas.MindMapResponse(
         unit_number=unit_number,
@@ -1838,20 +1930,24 @@ def handle_mindmap_node_action(
 ):
     fid = _resolve_faculty_id(user, req.faculty_id)
     store = get_vector_store(fid)
-    docs = store.similarity_search(f"Unit {req.unit_number} {req.node_label}", k=3)
-    context = "\n\n".join([d.page_content for d in docs]) if docs else f"Concept: {req.node_label}"
+    docs, _ = hybrid_search(store, req.node_label, unit_number=req.unit_number, k=4)
+    if not docs:
+        docs, _ = hybrid_search(store, req.node_label, k=4)
+    sources = format_sources(docs) if docs else f"Concept: {req.node_label}"
 
     if req.action == "explain":
-        prompt = f"Explain the concept '{req.node_label}' clearly in 3 concise bullet points for a student studying for an exam based on this context:\n{context[:2000]}"
+        task = f"Explain '{req.node_label}' in 3 concise bullet points for a student revising for an exam."
     elif req.action == "example":
-        prompt = f"Provide a clear real-world example explaining how '{req.node_label}' is used in practice based on this context:\n{context[:2000]}"
+        task = f"Give the example the notes use for '{req.node_label}'. If the notes have none, give one simple example consistent with the notes and say it is illustrative."
     elif req.action == "quiz":
-        prompt = f"Generate 1 multiple choice practice question testing '{req.node_label}' with 4 options and the correct answer indicated clearly."
+        task = f"Write 1 multiple-choice question testing '{req.node_label}' with 4 options (A-D), then the correct answer and a one-line reason."
     else:
-        prompt = f"Explain '{req.node_label}' concisely based on:\n{context[:2000]}"
+        task = f"Explain '{req.node_label}' concisely."
+
+    prompt = f"{task}\n\n{GROUNDING_RULES}\nSources:\n{sources}"
 
     response = safe_llm_invoke([
-        {"role": "system", "content": "You are a helpful virtual tutor explaining a specific mind map concept node."},
+        {"role": "system", "content": "You are a helpful tutor explaining one concept from the student's course notes."},
         {"role": "user", "content": prompt}
     ])
     content = extract_text(response).strip()
@@ -1889,17 +1985,17 @@ def generate_adaptive_quiz_question(
         else:
             current_diff = "medium"
 
-    query_str = f"Unit {req.unit_number} {req.subtopic or ''} key concepts"
-    docs = store.similarity_search(query_str, filter={"unit": req.unit_number} if req.unit_number else None, k=3)
-    if not docs:
-        docs = store.similarity_search(query_str, k=3)
-    context = "\n\n".join([d.page_content for d in docs]) if docs else "Syllabus topic content."
+    query_str = req.subtopic or (db.query(models.Unit.unit_name).filter(
+        models.Unit.faculty_id == fid, models.Unit.unit_number == req.unit_number
+    ).scalar() if req.unit_number else None) or "key concepts"
+    docs, _ = hybrid_search(store, query_str, unit_number=req.unit_number, k=5)
+    context = format_sources(docs) if docs else "Syllabus topic content."
 
     prompt = (
         f"Generate exactly 1 multiple choice question at **{current_diff.upper()}** difficulty level for Unit {req.unit_number}"
         f"{f' on topic: {req.subtopic}' if req.subtopic else ''}.\n"
         "Return ONLY a JSON object with keys: 'question', 'options' (array of 4 strings), 'correct_answer' (must match one option exactly), 'explanation'.\n\n"
-        f"Context:\n{context[:2500]}"
+        f"Sources:\n{context[:4000]}"
     )
 
     try:
@@ -1913,24 +2009,21 @@ def generate_adaptive_quiz_question(
             if raw_text.startswith("json"):
                 raw_text = raw_text[4:]
             raw_text = raw_text.strip()
-        data = json.loads(raw_text)
+        data = parse_llm_json(raw_text)
+        answer = normalize_mcq(data.get("options"), data.get("correct_answer") or data.get("answer"))
+        if not data.get("question") or not answer:
+            raise ValueError("unusable question")
         return schemas.AdaptiveQuizResponse(
             question_number=req.question_number,
             difficulty=current_diff,
-            question=data.get("question", f"Sample question on Unit {req.unit_number}"),
-            options=data.get("options", ["Option A", "Option B", "Option C", "Option D"]),
-            correct_answer=data.get("correct_answer", "Option A"),
-            explanation=data.get("explanation", "Correct based on syllabus definitions.")
+            question=data["question"],
+            options=data["options"],
+            correct_answer=answer,
+            explanation=data.get("explanation", "See your course notes for this topic.")
         )
     except Exception:
-        return schemas.AdaptiveQuizResponse(
-            question_number=req.question_number,
-            difficulty=current_diff,
-            question=f"Which of the following is a primary concept in Unit {req.unit_number}?",
-            options=["Theoretical Foundation", "Practical Application", "Standard Algorithm", "System Evaluation"],
-            correct_answer="Theoretical Foundation",
-            explanation="Theoretical Foundation represents the baseline core of this syllabus unit."
-        )
+        # No placeholder questions: they would be recorded as real attempts and skew mastery
+        raise HTTPException(status_code=503, detail="Couldn't create the next question right now (AI service busy). Please try again.")
 
 
 # ---------------------------------------------------------------------------
@@ -1953,13 +2046,14 @@ def generate_mock_exam(
     q_id_counter = 1
 
     for u_num in selected_units:
-        docs = store.similarity_search(f"Unit {u_num} core concepts exam questions", k=3)
-        context = "\n\n".join([d.page_content for d in docs]) if docs else f"Unit {u_num} overview"
+        # Sample across the whole unit so questions cover more than one section
+        context = unit_digest(store, u_num, max_chars=9000) or f"Unit {u_num} overview"
 
         prompt = (
-            f"Generate exactly {questions_per_unit} multiple choice exam questions for Unit {u_num}.\n"
+            f"Generate exactly {questions_per_unit} multiple choice exam questions for Unit {u_num}, "
+            "using ONLY facts from the notes below and spreading them across different sections.\n"
             "Return ONLY a JSON array of objects with keys: 'question', 'options' (4 strings), 'correct_answer', 'explanation'.\n\n"
-            f"Context:\n{context[:2500]}"
+            f"Notes:\n{context}"
         )
 
         try:
@@ -1973,28 +2067,26 @@ def generate_mock_exam(
                 if raw_text.startswith("json"):
                     raw_text = raw_text[4:]
                 raw_text = raw_text.strip()
-            q_list = json.loads(raw_text)
+            q_list = parse_llm_json(raw_text)
 
-            for q in q_list:
+            for q in q_list if isinstance(q_list, list) else []:
+                answer = normalize_mcq(q.get("options"), q.get("correct_answer") or q.get("answer"))
+                if not q.get("question") or not answer:
+                    continue
                 all_questions.append(schemas.MockExamQuestion(
                     id=q_id_counter,
                     unit_number=u_num,
-                    question=q.get("question", f"Unit {u_num} Question {q_id_counter}"),
-                    options=q.get("options", ["A", "B", "C", "D"]),
-                    correct_answer=q.get("correct_answer", "A"),
-                    explanation=q.get("explanation", "Refer to syllabus notes.")
+                    question=q["question"],
+                    options=q["options"],
+                    correct_answer=answer,
+                    explanation=q.get("explanation", "Refer to your course notes.")
                 ))
                 q_id_counter += 1
-        except Exception:
-            all_questions.append(schemas.MockExamQuestion(
-                id=q_id_counter,
-                unit_number=u_num,
-                question=f"What is the fundamental objective of Unit {u_num}?",
-                options=["Understand core concepts", "Analyze data structures", "Implement algorithms", "Evaluate systems"],
-                correct_answer="Understand core concepts",
-                explanation="Core concepts form the primary objective of this unit."
-            ))
-            q_id_counter += 1
+        except Exception as e:
+            print(f"Mock exam generation failed for unit {u_num}: {e}")
+
+    if not all_questions:
+        raise HTTPException(status_code=503, detail="Couldn't create the exam right now (AI service busy). Please try again in a minute.")
 
     exam_id = f"exam_{user.id}_{int(datetime.utcnow().timestamp())}"
 
@@ -2060,12 +2152,19 @@ def submit_mock_exam(
         if u_pct < 60.0:
             weak_units.append(u_num)
 
+    weak_list = ", ".join(f"Unit {u}" for u in sorted(weak_units))
     if score_pct >= 85:
-        ai_feedback = "Outstanding performance! You have demonstrated thorough mastery across all tested units."
+        ai_feedback = "Excellent work. You know these units well; a quick revision before the exam will keep it that way."
     elif score_pct >= 60:
-        ai_feedback = f"Good effort! You passed the mock exam, but should review Unit(s) {', '.join(map(str, weak_units))} before the final test."
+        ai_feedback = (
+            f"You passed. Review {weak_list} before the final exam, then try again." if weak_units
+            else "You passed. Go through the questions you missed below to close the remaining gaps."
+        )
     else:
-        ai_feedback = f"Additional revision recommended. Focus on Unit(s) {', '.join(map(str, weak_units))} and retake practice quizzes."
+        ai_feedback = (
+            f"More revision needed. Start with {weak_list}: read the notes, then take a practice quiz."
+            if weak_units else "More revision needed. Go through the questions you missed below."
+        )
 
     return schemas.MockExamReportResponse(
         total_questions=total_q,
@@ -2086,6 +2185,7 @@ def submit_mock_exam(
 def get_unit_revision_notes(
     unit_number: int,
     faculty_id: Optional[int] = None,
+    refresh: bool = False,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
@@ -2096,11 +2196,12 @@ def get_unit_revision_notes(
     ).first()
     unit_name = unit.unit_name if unit else f"Unit {unit_number}"
 
-    # 1. Check DB Cache
-    cached_notes = db.query(models.RevisionNotesCache).filter(
+    # 1. Check DB Cache (refresh=true skips it; the old copy is only replaced once new notes succeed)
+    notes_q = db.query(models.RevisionNotesCache).filter(
         models.RevisionNotesCache.faculty_id == fid,
         models.RevisionNotesCache.unit_number == unit_number
-    ).first()
+    )
+    cached_notes = None if refresh else notes_q.first()
 
     if cached_notes:
         return schemas.RevisionNotesResponse(
@@ -2110,35 +2211,46 @@ def get_unit_revision_notes(
             cached=True
         )
 
-    # 2. Query RAG vector store for comprehensive unit notes
+    # 2. Read the whole unit (this used to search every unit and could mix in other units' content)
     store = get_vector_store(fid)
-    docs = store.similarity_search(f"Unit {unit_number} definitions formulas key exam points overview", k=8)
-    context = "\n\n".join([d.page_content for d in docs]) if docs else f"Notes for {unit_name}"
+    context = unit_digest(store, unit_number, max_chars=28000) or f"Notes for {unit_name}"
 
     prompt = (
-        f"Create comprehensive high-yield Exam Revision Notes for Unit {unit_number}: '{unit_name}'.\n"
-        "Format in clean, structured GitHub Markdown with the following sections:\n\n"
-        "### 1. 📌 Core Concepts & Overview\n"
-        "### 2. 📖 Key Definitions\n"
-        "### 3. ⚙️ Formulas & Theoretical Rules\n"
-        "### 4. 🎯 High-Yield Exam Points\n"
-        "### 5. ❓ Expected Examination Questions\n\n"
-        f"Syllabus Context:\n{context[:3500]}"
+        f"Below are the complete lecture notes for Unit {unit_number}: '{unit_name}', in page order.\n"
+        "Write exam revision notes that summarise THESE notes, section by section, in the order they appear.\n"
+        "Use the notes' own definitions and terms; do not add material that is not in them. "
+        "Put the page number after each point like (p. 7). No emojis.\n"
+        "Format in clean GitHub Markdown with these sections:\n\n"
+        "### 1. Overview\n"
+        "### 2. Key Definitions\n"
+        "### 3. Important Concepts (one sub-heading per section of the notes)\n"
+        "### 4. Formulas, Algorithms & Steps (only if the notes have them)\n"
+        "### 5. Likely Exam Questions\n\n"
+        f"Lecture notes:\n{context}"
     )
 
-    response = safe_llm_invoke([
-        {"role": "system", "content": "You are an expert professor writing syllabus-bound revision notes."},
-        {"role": "user", "content": prompt}
-    ])
-    notes_markdown = extract_text(response).strip()
+    try:
+        response = safe_llm_invoke([
+            {"role": "system", "content": "You are an expert professor writing syllabus-bound revision notes."},
+            {"role": "user", "content": prompt}
+        ])
+        notes_markdown = extract_text(response).strip()
+    except Exception:
+        notes_markdown = ""
+    if not notes_markdown:
+        raise HTTPException(
+            status_code=503,
+            detail="Couldn't write the notes right now (AI service busy). "
+            + ("Your previous notes are kept." if notes_q.first() else "Please try again in a minute."),
+        )
 
-    # Save to Cache
-    new_cache = models.RevisionNotesCache(
+    # Save to Cache, replacing any older copy
+    notes_q.delete()
+    db.add(models.RevisionNotesCache(
         faculty_id=fid,
         unit_number=unit_number,
         notes_json=notes_markdown
-    )
-    db.add(new_cache)
+    ))
     db.commit()
 
     return schemas.RevisionNotesResponse(
@@ -2238,6 +2350,123 @@ def get_student_gamification(
         accuracy_percent=accuracy_pct,
         badges=badges
     )
+
+
+@app.get("/student/insights")
+def get_student_insights(
+    faculty_id: Optional[int] = None,
+    unit_numbers: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """
+    Topic-level mastery computed directly from the student's quiz attempts (no LLM call),
+    so every number on the Weak Topics page is traceable to real answers.
+    """
+    fid = _resolve_faculty_id(user, faculty_id)
+    q = db.query(models.QuizAttempt).filter(
+        models.QuizAttempt.user_id == user.id,
+        models.QuizAttempt.faculty_id == fid,
+    )
+    if unit_numbers:
+        wanted = [int(x) for x in unit_numbers.split(",") if x.strip().isdigit()]
+        if wanted:
+            q = q.filter(models.QuizAttempt.unit_number.in_(wanted))
+    attempts = q.all()
+
+    units = {u.unit_number: u.unit_name for u in db.query(models.Unit).filter(models.Unit.faculty_id == fid).all()}
+
+    groups: dict = {}
+    for a in attempts:
+        topic = (a.topic_query or "").strip()
+        if not topic or topic.lower().startswith(("unit ", "diagnostic", "mock exam")):
+            topic = units.get(a.unit_number, f"Unit {a.unit_number}")
+        g = groups.setdefault((a.unit_number, topic), {"total": 0, "correct": 0})
+        g["total"] += 1
+        g["correct"] += 1 if a.is_correct else 0
+
+    topics = []
+    for (unit_no, topic), g in groups.items():
+        mastery = round(g["correct"] / g["total"] * 100, 1)
+        status = "strong" if mastery >= 80 else "developing" if mastery >= 50 else "weak"
+        topics.append({
+            "unit_number": unit_no,
+            "topic": topic,
+            "total_attempts": g["total"],
+            "correct_count": g["correct"],
+            "mastery_percent": mastery,
+            "status": status,
+        })
+    topics.sort(key=lambda t: (t["mastery_percent"], -t["total_attempts"]))
+
+    weak = [t for t in topics if t["status"] == "weak"]
+    strong = [t for t in topics if t["status"] == "strong"]
+    weak_topics = [
+        {
+            **t,
+            "priority": "High" if t["mastery_percent"] < 35 else "Medium",
+            "why_evidence": f"{t['correct_count']} of {t['total_attempts']} answers correct on this topic.",
+        }
+        for t in weak
+    ]
+
+    total = len(attempts)
+    correct = sum(1 for a in attempts if a.is_correct)
+    game = get_student_gamification(db=db, user=user)
+
+    recommendations = []
+    if weak:
+        w = weak[0]
+        recommendations.append({
+            "type": "review", "title": "Review first", "topic": w["topic"], "unit_number": w["unit_number"],
+            "evidence_why": f"Your lowest score: {w['mastery_percent']}% over {w['total_attempts']} questions. Re-read it, then retry a quiz.",
+            "action_type": "explain",
+        })
+    developing = [t for t in topics if t["status"] == "developing"]
+    if developing:
+        d = developing[0]
+        recommendations.append({
+            "type": "practice", "title": "Almost there", "topic": d["topic"], "unit_number": d["unit_number"],
+            "evidence_why": f"{d['mastery_percent']}% so far. One more quiz could push it above 80%.",
+            "action_type": "quiz",
+        })
+    attempted_units = {a.unit_number for a in attempts}
+    untouched = [n for n in sorted(units) if n not in attempted_units]
+    if untouched:
+        n = untouched[0]
+        recommendations.append({
+            "type": "focus_next", "title": "Not started", "topic": units[n], "unit_number": n,
+            "evidence_why": f"You haven't practised Unit {n} yet. Start by asking a doubt or reading its notes.",
+            "action_type": "study",
+        })
+    if strong:
+        st = strong[-1]
+        recommendations.append({
+            "type": "maintain", "title": "Keep it fresh", "topic": st["topic"], "unit_number": st["unit_number"],
+            "evidence_why": f"Strong at {st['mastery_percent']}%. A quick quiz before the exam keeps it that way.",
+            "action_type": "quiz",
+        })
+
+    has_data = total >= 3
+    return {
+        "is_new_learner": total == 0,
+        "new_learner_message": None if has_data else
+            "Answer at least 3 quiz questions so we can measure which topics you know and which need work.",
+        "overview": {
+            "has_sufficient_data": has_data,
+            "overall_mastery": round(correct / total * 100, 1) if total else 0.0,
+            "total_attempts": total,
+            "questions_answered": total,
+            "correct_answers": correct,
+            "weak_count": len(weak),
+            "strong_count": len(strong),
+            "xp": game.xp,
+            "streak_days": game.streak_days,
+        },
+        "recommendations": recommendations[:4],
+        "weak_topics": weak_topics,
+        "topic_mastery_list": topics,
+    }
 
 
 @app.get("/health")

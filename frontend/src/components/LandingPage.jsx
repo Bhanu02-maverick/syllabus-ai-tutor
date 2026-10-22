@@ -1,6 +1,36 @@
 import React from "react";
-import { GraduationCap, ArrowRight } from "lucide-react";
+import {
+  GraduationCap,
+  ArrowRight,
+  UserPlus,
+  BookOpen,
+  MessageSquare,
+  ClipboardCheck,
+  Network,
+  BookMarked,
+  Clock,
+  Target,
+  ShieldCheck,
+} from "lucide-react";
 import { MacbookScroll } from "./ui/MacbookScroll.jsx";
+
+const STUDENT_STEPS = [
+  { icon: UserPlus, title: "Sign up & pick your course", desc: "Create a student account and choose your subject and professor." },
+  { icon: BookOpen, title: "Open a unit", desc: "Your faculty has already uploaded the notes. Pick the unit you're studying." },
+  { icon: MessageSquare, title: "Ask your doubts", desc: "Ask in your own words. Every answer comes from your notes and shows the page it came from." },
+  { icon: ClipboardCheck, title: "Practise & track", desc: "Take quizzes and mock exams. Your dashboard shows which units need more work." },
+];
+
+const FEATURES = [
+  { icon: MessageSquare, title: "Doubt solving", desc: "Exam-style or analogy explanations, with page references." },
+  { icon: Network, title: "Mind maps", desc: "See how every topic in a unit connects. Click a topic to learn it." },
+  { icon: BookMarked, title: "Revision notes", desc: "One-click summary notes for last-minute revision." },
+  { icon: ClipboardCheck, title: "Adaptive quizzes", desc: "Questions get harder or easier based on your answers." },
+  { icon: Clock, title: "Timed mock exams", desc: "Practise under real exam conditions across several units." },
+  { icon: Target, title: "Weak-topic finder", desc: "Find what to study next and get a day-by-day study plan." },
+];
+
+const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
 export default function LandingPage({ onNavigateLogin, onNavigateSignup }) {
   return (
@@ -25,6 +55,13 @@ export default function LandingPage({ onNavigateLogin, onNavigateSignup }) {
               </span>
             </div>
           </div>
+
+          {/* Center: Section links */}
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
+            <button type="button" onClick={() => scrollTo("features")} className="hover:text-indigo-600 transition cursor-pointer">Features</button>
+            <button type="button" onClick={() => scrollTo("how-it-works")} className="hover:text-indigo-600 transition cursor-pointer">How it works</button>
+            <button type="button" onClick={() => scrollTo("about")} className="hover:text-indigo-600 transition cursor-pointer">About</button>
+          </nav>
 
           {/* Right: Login & Get Started Buttons */}
           <div className="flex items-center gap-3">
@@ -68,8 +105,8 @@ export default function LandingPage({ onNavigateLogin, onNavigateSignup }) {
                   <span className="text-indigo-600">Stay Syllabus-Bound.</span>
                 </h1>
                 <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl mx-auto">
-                  An academic AI tutor grounded strictly in your university course curriculum,
-                  featuring interactive concept mind maps and verified lecture citations.
+                  Your AI study companion built on your actual syllabus. Ask doubts, explore mind maps,
+                  revise with notes and practise with quizzes and mock exams — all in one place.
                 </p>
               </div>
             }
@@ -83,8 +120,84 @@ export default function LandingPage({ onNavigateLogin, onNavigateSignup }) {
           />
         </div>
 
-        {/* 3. Below the MacBook: Focused Action Area */}
-        <section className="relative z-20 -mt-16 sm:-mt-24 pb-20 px-4 text-center">
+        {/* Sections below sit on an opaque layer so the laptop's scroll animation slides behind them */}
+        <div className="relative z-30 bg-[#FBFBFC] pt-16 border-t border-slate-200/80">
+        {/* 3. How it works for students */}
+        <section id="how-it-works" className="relative z-20 px-4 pb-20 scroll-mt-20">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">How it works</p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-2">
+                Start studying in four steps
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {STUDENT_STEPS.map((step, idx) => {
+                const Icon = step.icon;
+                return (
+                  <div key={step.title} className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="w-7 h-7 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <Icon className="w-5 h-5 text-indigo-500" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900">{step.title}</h3>
+                    <p className="text-xs text-slate-500 leading-relaxed mt-1.5">{step.desc}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* 4. Features */}
+        <section id="features" className="relative z-20 px-4 pb-20 scroll-mt-20">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">Features</p>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mt-2">
+                Everything you need before an exam
+              </h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {FEATURES.map((f) => {
+                const Icon = f.icon;
+                return (
+                  <div key={f.title} className="flex gap-3 bg-white border border-slate-200/90 rounded-2xl p-5">
+                    <div className="p-2 h-fit rounded-xl bg-indigo-50 text-indigo-600">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">{f.title}</h3>
+                      <p className="text-xs text-slate-500 leading-relaxed mt-1">{f.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* 5. About */}
+        <section id="about" className="relative z-20 px-4 pb-20 scroll-mt-20">
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row gap-5 items-start bg-indigo-50/60 border border-indigo-100 rounded-3xl p-6 sm:p-8">
+            <div className="p-3 rounded-2xl bg-white text-indigo-600 border border-indigo-100">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">Why you can trust the answers</h2>
+              <p className="text-sm text-slate-600 leading-relaxed mt-2">
+                Generic chatbots answer from the whole internet. VCE AI Tutor only reads the notes your faculty
+                uploaded for your course. If your question isn't covered by the syllabus, it tells you so instead
+                of guessing — and every answer shows the page it was taken from, so you can check it yourself.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* 6. Focused Action Area */}
+        <section className="relative z-20 pb-20 px-4 text-center">
           <div className="max-w-xl mx-auto space-y-5 bg-white border border-slate-200/90 shadow-xl shadow-slate-200/50 rounded-3xl p-8 sm:p-10">
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Ready to explore your course syllabus?
@@ -110,13 +223,14 @@ export default function LandingPage({ onNavigateLogin, onNavigateSignup }) {
               </button>
             </div>
             <p className="text-[11px] font-semibold text-slate-400 pt-2">
-              Faculty-grounded RAG • Course syllabus bound • Zero hallucination risk
+              Answers only from your course notes • Page references on every answer
             </p>
           </div>
         </section>
+        </div>
       </main>
 
-      {/* 4. Minimal Footer */}
+      {/* 7. Minimal Footer */}
       <footer className="bg-white border-t border-slate-200/80 py-6 text-xs text-slate-400">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span>© 2026 VCE AI Tutor • Syllabus-Bound Adaptive Learning</span>

@@ -18,7 +18,6 @@ import {
   ToggleLeft,
   ToggleRight,
   TrendingDown,
-  Sparkles,
   Layers,
   FileText,
   Sliders,
@@ -32,7 +31,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../api";
 import ThemeToggle from "./ThemeToggle.jsx";
-import NetworkCanvas from "./NetworkCanvas.jsx";
 
 export default function FacultyDashboard({ user, onLogout }) {
   // Theme state
@@ -323,11 +321,18 @@ export default function FacultyDashboard({ user, onLogout }) {
       : 0;
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-hidden ${
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 relative overflow-x-clip ${
       isDark ? "bg-[#0B1020] text-slate-100" : "bg-[#F8FAFC] text-slate-800"
     }`}>
-      {/* 60 FPS HTML5 Canvas Background Particle Network */}
-      <NetworkCanvas isDark={isDark} />
+      {/* Soft static backdrop */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 top-0 h-[420px] ${
+          isDark
+            ? "bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.12),transparent_65%)]"
+            : "bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_65%)]"
+        }`}
+      />
 
       {/* Header */}
       <header className={`px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-sm border-b transition-colors z-20 ${
@@ -590,7 +595,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                   disabled={uploading || !uploadFile}
                   className="w-full py-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-bold text-sm rounded-2xl shadow-lg hover:from-blue-500 hover:to-purple-500 transition disabled:opacity-40 flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                   {uploading ? "Indexing ChromaDB Vector Chunks..." : "Upload & Index Syllabus PDF"}
                 </motion.button>
 
@@ -750,7 +755,7 @@ export default function FacultyDashboard({ user, onLogout }) {
                       disabled={qbLoading || !qbUnit}
                       className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-40 flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      {qbLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      {qbLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                       {qbLoading ? "Generating..." : "Generate"}
                     </motion.button>
                   </div>

@@ -50,6 +50,7 @@ class Citation(BaseModel):
     source: str
     page: int
     unit: int
+    snippet: Optional[str] = None
 
 
 class AskResponse(BaseModel):
