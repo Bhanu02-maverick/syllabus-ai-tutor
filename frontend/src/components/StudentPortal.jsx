@@ -393,6 +393,7 @@ export default function StudentPortal({ user, onLogout }) {
   const [mockExamTimeLeft, setMockExamTimeLeft] = useState(1200);
   const [mockExamLoading, setMockExamLoading] = useState(false);
   const [mockExamReport, setMockExamReport] = useState(null);
+  const [mockExamError, setMockExamError] = useState("");
 
 
 
@@ -609,12 +610,10 @@ export default function StudentPortal({ user, onLogout }) {
 
   // ─── Timed Mock Exam Handlers ───
   const handleStartMockExam = async () => {
-    if (mockExamSelectedUnits.length === 0 || !selectedFacultyId) {
-      alert("Please select at least one unit for the mock exam.");
-      return;
-    }
+    if (mockExamSelectedUnits.length === 0 || !selectedFacultyId) return;
     setMockExamLoading(true);
     setMockExamReport(null);
+    setMockExamError("");
     try {
       const data = await api.generateMockExam(
         mockExamSelectedUnits,
@@ -628,7 +627,7 @@ export default function StudentPortal({ user, onLogout }) {
       setMockExamTimeLeft(data.duration_minutes * 60);
       setMockExamActive(true);
     } catch (err) {
-      alert(err.message || "Could not generate mock exam.");
+      setMockExamError(err.message || "Could not generate the mock exam.");
     } finally {
       setMockExamLoading(false);
     }
@@ -648,6 +647,14 @@ export default function StudentPortal({ user, onLogout }) {
     return () => clearInterval(timer);
   }, [mockExamActive, mockExamTimeLeft]);
 
+  // Time's up: submit automatically (only once — submitting flips mockExamActive off)
+  useEffect(() => {
+    if (mockExamActive && mockExamTimeLeft === 0 && !mockExamLoading) {
+      handleFinalSubmitMockExam();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockExamActive, mockExamTimeLeft]);
+
   const handleFinalSubmitMockExam = async () => {
     if (!mockExamData || !selectedFacultyId) return;
     setMockExamLoading(true);
@@ -664,7 +671,7 @@ export default function StudentPortal({ user, onLogout }) {
       loadProgress(selectedFacultyId);
       loadGamification();
     } catch (err) {
-      alert(err.message || "Error submitting mock exam.");
+      setMockExamError(err.message || "Could not submit the exam. Your answers are still here; please try again.");
     } finally {
       setMockExamLoading(false);
     }
@@ -1858,225 +1865,36 @@ export default function StudentPortal({ user, onLogout }) {
 
           {/* ═══════════════ MOCK EXAM TAB ═══════════════ */}
           {activeTab === "mock_exam" && (
-            <div className="space-y-6">
-              {!mockExamActive && !mockExamReport && (
-                <div className={`p-6 rounded-2xl border space-y-5 transition-all ${isDark ? "bg-slate-900/90 border-slate-800 text-slate-100 shadow-2xl" : "bg-white border-slate-200 text-slate-900 shadow-sm"}`}>
-                  <div className="text-center space-y-2">
-                    <Clock className="h-10 w-10 text-amber-500 mx-auto animate-pulse" />
-                    <h3 className={`text-lg font-bold ${isDark ? "text-white" : "text-slate-900"}`}>Timed AI Mock Exam Simulator</h3>
-                    <p className={`text-sm max-w-md mx-auto ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                      Simulate actual examination conditions across multiple units with live timer and per-unit score analysis.
-                    </p>
-                  </div>
-
-                  <div className={`max-w-xl mx-auto space-y-4 p-5 rounded-xl border ${isDark ? "bg-slate-950/60 border-slate-800" : "bg-slate-50 border-slate-200"}`}>
-                    <div>
-                      <label className={`block text-xs font-bold mb-2 ${isDark ? "text-slate-300" : "text-slate-700"}`}>Select Examination Units:</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {units.map((u) => (
-                          <label key={u.unit_number} className={`flex items-center gap-2 text-xs p-2 rounded-lg border cursor-pointer ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-200 text-slate-800"}`}>
-                            <input
-                              type="checkbox"
-                              checked={mockExamSelectedUnits.includes(u.unit_number)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setMockExamSelectedUnits((prev) => [...prev, u.unit_number]);
-                                } else {
-                                  setMockExamSelectedUnits((prev) => prev.filter((id) => id !== u.unit_number));
-                                }
-                              }}
-                              className="rounded text-amber-600 focus:ring-amber-500"
-                            />
-                            <span>Unit {u.unit_number}: {u.unit_name}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={`block text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-slate-700"}`}>Duration (Minutes):</label>
-                        <select
-                          value={mockExamDuration}
-                          onChange={(e) => setMockExamDuration(Number(e.target.value))}
-                          className={`w-full border rounded-lg p-2 text-xs font-semibold outline-none ${isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"}`}
-                        >
-                          <option value={10}>10 Minutes</option>
-                          <option value={20}>20 Minutes</option>
-                          <option value={30}>30 Minutes</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">Total Questions:</label>
-                        <select
-                          value={mockExamNumQuestions}
-                          onChange={(e) => setMockExamNumQuestions(Number(e.target.value))}
-                          className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-semibold"
-                        >
-                          <option value={10}>10 Questions</option>
-                          <option value={15}>15 Questions</option>
-                          <option value={20}>20 Questions</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={handleStartMockExam}
-                      disabled={mockExamLoading || mockExamSelectedUnits.length === 0}
-                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-sm hover:from-amber-600 hover:to-orange-700 shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-                    >
-                      {mockExamLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
-                      {mockExamLoading ? "Generating Exam Questions..." : "Start Timed Mock Exam"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Active Exam Interface */}
-              {mockExamActive && mockExamData && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-md p-6 space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200">
-                    <div>
-                      <h3 className="font-bold text-slate-900 text-base">Timed Mock Examination</h3>
-                      <p className="text-xs text-slate-500">Question {mockExamCurrentIndex + 1} of {mockExamData.questions.length}</p>
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-300 px-4 py-2 rounded-xl text-amber-900 font-mono font-bold text-sm">
-                      <Clock className="h-4 w-4 text-amber-600 animate-pulse" />
-                      Time Left: {Math.floor(mockExamTimeLeft / 60)}:{(mockExamTimeLeft % 60).toString().padStart(2, "0")}
-                    </div>
-                  </div>
-
-                  {/* Question Cards */}
-                  {mockExamData.questions[mockExamCurrentIndex] && (
-                    <div className="space-y-4">
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                          Unit {mockExamData.questions[mockExamCurrentIndex].unit_number}
-                        </span>
-                        <h4 className="font-bold text-slate-900 text-sm mt-2">
-                          Q{mockExamCurrentIndex + 1}. {mockExamData.questions[mockExamCurrentIndex].question}
-                        </h4>
-                      </div>
-
-                      <div className="space-y-2">
-                        {mockExamData.questions[mockExamCurrentIndex].options.map((opt, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => {
-                              setMockExamAnswers((prev) => ({
-                                ...prev,
-                                [mockExamData.questions[mockExamCurrentIndex].id]: opt,
-                              }));
-                            }}
-                            className={`w-full text-left p-3.5 rounded-xl border text-xs font-semibold transition flex items-center justify-between cursor-pointer ${
-                              mockExamAnswers[mockExamData.questions[mockExamCurrentIndex].id] === opt
-                                ? "bg-amber-50 border-amber-400 text-amber-900 shadow-xs"
-                                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
-                            }`}
-                          >
-                            <span>{opt}</span>
-                            {mockExamAnswers[mockExamData.questions[mockExamCurrentIndex].id] === opt && (
-                              <CheckCircle2 className="h-4 w-4 text-amber-600" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Navigator Footer */}
-                  <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-slate-100">
-                    <button
-                      onClick={() => setMockExamCurrentIndex((prev) => Math.max(0, prev - 1))}
-                      disabled={mockExamCurrentIndex === 0}
-                      className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold disabled:opacity-40 cursor-pointer"
-                    >
-                      Previous
-                    </button>
-
-                    <div className="flex gap-1 overflow-x-auto max-w-xs py-1">
-                      {mockExamData.questions.map((q, idx) => (
-                        <button
-                          key={q.id}
-                          onClick={() => setMockExamCurrentIndex(idx)}
-                          className={`w-7 h-7 rounded-lg text-xs font-bold transition flex items-center justify-center cursor-pointer ${
-                            mockExamCurrentIndex === idx
-                              ? "bg-amber-600 text-white"
-                              : mockExamAnswers[q.id]
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {idx + 1}
-                        </button>
-                      ))}
-                    </div>
-
-                    {mockExamCurrentIndex < mockExamData.questions.length - 1 ? (
-                      <button
-                        onClick={() => setMockExamCurrentIndex((prev) => prev + 1)}
-                        className="px-4 py-2 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 transition cursor-pointer"
-                      >
-                        Next
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleFinalSubmitMockExam}
-                        className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 shadow-sm transition cursor-pointer"
-                      >
-                        Submit Mock Exam
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* End of Exam Report */}
-              {mockExamReport && (
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-md space-y-6">
-                  <div className="text-center space-y-2 pb-4 border-b border-slate-200">
-                    <Trophy className={`h-12 w-12 mx-auto ${mockExamReport.passed ? "text-amber-500" : "text-slate-400"}`} />
-                    <h3 className="text-xl font-bold text-slate-900">Mock Exam Results Report</h3>
-                    <p className="text-sm font-semibold text-slate-600">
-                      Overall Score: <span className={mockExamReport.passed ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>{mockExamReport.score_percent}%</span> ({mockExamReport.correct_count} / {mockExamReport.total_questions})
-                    </p>
-                  </div>
-
-                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
-                    <strong>Tutor feedback:</strong> {mockExamReport.ai_feedback}
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">Per-Unit Performance Breakdown</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {mockExamReport.unit_breakdown.map((ub) => (
-                        <div key={ub.unit_number} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
-                          <div>
-                            <span className="font-bold text-xs text-slate-800">Unit {ub.unit_number}</span>
-                            <p className="text-[10px] text-slate-500">{ub.correct} of {ub.total} correct</p>
-                          </div>
-                          <span className={`text-xs font-bold px-2 py-1 rounded-md ${ub.score_percent >= 60 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                            {ub.score_percent}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setMockExamReport(null);
-                      setMockExamActive(false);
-                    }}
-                    className="w-full py-2.5 bg-slate-800 text-white rounded-xl text-xs font-bold hover:bg-slate-900 transition cursor-pointer"
-                  >
-                    Close Exam Report
-                  </button>
-                </div>
-              )}
-            </div>
+            <TimedMockExamView
+              mockExamActive={mockExamActive}
+              mockExamReport={mockExamReport}
+              mockExamSelectedUnits={mockExamSelectedUnits}
+              setMockExamSelectedUnits={setMockExamSelectedUnits}
+              mockExamDuration={mockExamDuration}
+              setMockExamDuration={setMockExamDuration}
+              mockExamNumQuestions={mockExamNumQuestions}
+              setMockExamNumQuestions={setMockExamNumQuestions}
+              units={indexedUnits}
+              mockExamLoading={mockExamLoading}
+              mockExamError={mockExamError}
+              handleStartMockExam={handleStartMockExam}
+              mockExamData={mockExamData}
+              mockExamCurrentIndex={mockExamCurrentIndex}
+              setMockExamCurrentIndex={setMockExamCurrentIndex}
+              mockExamAnswers={mockExamAnswers}
+              setMockExamAnswers={setMockExamAnswers}
+              mockExamTimeLeft={mockExamTimeLeft}
+              handleFinalSubmitMockExam={handleFinalSubmitMockExam}
+              setMockExamReport={setMockExamReport}
+              setMockExamActive={setMockExamActive}
+              onReviseUnit={(unitNumber) => {
+                setNotesUnit(String(unitNumber));
+                setActiveTab("notes");
+                handleLoadNotes(String(unitNumber));
+              }}
+              onPracticeUnit={handleFullUnitQuiz}
+              isDark={isDark}
+            />
           )}
 
           {/* ═══════════════ QUIZ TAB ═══════════════ */}

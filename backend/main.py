@@ -26,6 +26,7 @@ subjects never mix. Students are enrolled under a specific faculty at signup.
 
 import os
 import json
+import re
 import shutil
 from collections import Counter
 from datetime import datetime, timedelta
@@ -69,6 +70,11 @@ import time as _time
 from langchain_openai import ChatOpenAI
 
 FALLBACK_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]
+
+# Each attempt is capped so a rate-limited provider fails over quickly instead of the
+# client's built-in exponential retries (up to 6) stalling the request for minutes.
+LLM_TIMEOUT_SECONDS = 75
+LLM_MAX_RETRIES = 1
 OPENROUTER_FREE_MODELS = [
     "openrouter/free",
     "google/gemma-4-31b-it:free",
@@ -94,7 +100,8 @@ def safe_llm_invoke(messages):
     api_keys = get_api_keys()
     for key in api_keys:
         try:
-            kwargs = {"model": "gemini-3.6-flash", "temperature": 0.2}
+            kwargs = {"model": "gemini-3.6-flash", "temperature": 0.2,
+                      "timeout": LLM_TIMEOUT_SECONDS, "max_retries": LLM_MAX_RETRIES}
             if key:
                 kwargs["google_api_key"] = key
             current_llm = ChatGoogleGenerativeAI(**kwargs)
@@ -117,6 +124,8 @@ def safe_llm_invoke(messages):
                     base_url="https://openrouter.ai/api/v1",
                     model=or_model,
                     temperature=0.2,
+                    timeout=LLM_TIMEOUT_SECONDS,
+                    max_retries=LLM_MAX_RETRIES,
                 )
                 print(f"🚀 Directly invoking OpenRouter model: {or_model}...")
                 return current_llm.invoke(messages)
@@ -128,7 +137,8 @@ def safe_llm_invoke(messages):
     # 3. Fallback: Secondary Gemini model (gemini-2.5-flash)
     for key in api_keys:
         try:
-            kwargs = {"model": "gemini-2.5-flash", "temperature": 0.2}
+            kwargs = {"model": "gemini-2.5-flash", "temperature": 0.2,
+                      "timeout": LLM_TIMEOUT_SECONDS, "max_retries": LLM_MAX_RETRIES}
             if key:
                 kwargs["google_api_key"] = key
             current_llm = ChatGoogleGenerativeAI(**kwargs)
@@ -241,6 +251,60 @@ def build_citations(docs, limit: int = 4) -> List[schemas.Citation]:
     return out
 
 
+def parse_llm_json(text: str):
+    """Parse JSON from an LLM reply, tolerating code fences and leading/trailing prose."""
+    raw = (text or "").strip().replace("```json", "```")
+    if "```" in raw:
+        raw = raw.split("```")[1] if raw.count("```") >= 2 else raw.replace("```", "")
+    raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        starts = [i for i in (raw.find("["), raw.find("{")) if i != -1]
+        if not starts:
+            raise
+        start = min(starts)
+        end = max(raw.rfind("]"), raw.rfind("}"))
+        return json.loads(raw[start:end + 1])
+
+
+_OPTION_PREFIX = re.compile(r"^\s*(?:option\s*)?\(?([a-dA-D])[\).:\-]\s+")
+
+
+def normalize_mcq(options, answer) -> Optional[str]:
+    """
+    Map the model's 'correct answer' onto the exact option text the student clicks.
+    Models often answer "B", "Option B", "B) ..." or a lightly reworded option, which
+    would otherwise mark every correct student answer as wrong. Returns None if no
+    option can be matched (the question is then dropped).
+    """
+    if not isinstance(options, list) or len(options) < 2 or answer is None:
+        return None
+    options = [str(o) for o in options]
+    ans = str(answer).strip()
+
+    def bare(t):
+        return re.sub(r"\s+", " ", _OPTION_PREFIX.sub("", t)).strip().lower().rstrip(".")
+
+    for o in options:
+        if o.strip() == ans:
+            return o
+    letter = re.fullmatch(r"(?:option\s*)?\(?([a-dA-D])\)?\.?", ans, flags=re.I)
+    if letter:
+        idx = "abcd".index(letter.group(1).lower())
+        return options[idx] if idx < len(options) else None
+    for o in options:
+        if bare(o) == bare(ans):
+            return o
+    prefixed = _OPTION_PREFIX.match(ans)
+    if prefixed:
+        idx = "abcd".index(prefixed.group(1).lower())
+        if idx < len(options):
+            return options[idx]
+    hits = [o for o in options if bare(ans) and (bare(ans) in bare(o) or bare(o) in bare(ans))]
+    return hits[0] if len(hits) == 1 else None
+
+
 GROUNDING_RULES = (
     "Rules:\n"
     "- Use ONLY the numbered sources below. They are the student's own course notes.\n"
@@ -259,7 +323,6 @@ def majority_unit(docs) -> Optional[int]:
     return Counter(units).most_common(1)[0][0]
 
 
-import re
 
 
 def suggest_unit_name(file_path: str) -> str:
@@ -701,20 +764,16 @@ def generate_micro_quiz(
 
     # Retrieve more chunks for larger quizzes
     k = min(5 + (num_q // 2), 25)
-    if unit_number:
-        docs = store.similarity_search(search_query, k=k, filter={"unit": unit_number})
-    else:
-        retriever = store.as_retriever(search_kwargs={"k": k})
-        docs = retriever.invoke(search_query)
-
-    context = "\n".join([d.page_content for d in docs])
+    docs, _ = hybrid_search(store, search_query, unit_number=unit_number, k=max(k, 6))
+    context = format_sources(docs)
     resolved_unit = unit_number or majority_unit(docs)
 
     quiz_prompt = (
         f"Generate exactly {num_q} syllabus-aligned multiple choice questions strictly based on the context below. "
+        "Use only facts stated in the sources; vary the questions across different points.\n"
         "Return ONLY a JSON array with objects containing 'question', 'options' (array of 4 strings), "
-        "and 'answer' (exact string matching the correct option).\n\n"
-        f"Context:\n{context}"
+        "'answer' (exact string matching the correct option) and 'explanation' (one sentence citing the page).\n\n"
+        f"Sources:\n{context}"
     )
 
     response = safe_llm_invoke([
@@ -723,10 +782,16 @@ def generate_micro_quiz(
     ])
 
     try:
-        clean_content = extract_text(response).strip().replace("```json", "").replace("```", "")
-        quiz_data = json.loads(clean_content)
+        raw_items = parse_llm_json(extract_text(response))
     except Exception:
-        quiz_data = []
+        raw_items = []
+    quiz_data = []
+    for item in raw_items if isinstance(raw_items, list) else []:
+        answer = normalize_mcq(item.get("options"), item.get("answer") or item.get("correct_answer"))
+        if item.get("question") and answer:
+            quiz_data.append({**item, "answer": answer})
+    if not quiz_data:
+        raise HTTPException(status_code=503, detail="Couldn't create quiz questions right now (AI service busy). Please try again.")
 
     return schemas.QuizResponse(unit_number=resolved_unit, quizzes=quiz_data)
 
@@ -1920,17 +1985,17 @@ def generate_adaptive_quiz_question(
         else:
             current_diff = "medium"
 
-    query_str = f"Unit {req.unit_number} {req.subtopic or ''} key concepts"
-    docs = store.similarity_search(query_str, filter={"unit": req.unit_number} if req.unit_number else None, k=3)
-    if not docs:
-        docs = store.similarity_search(query_str, k=3)
-    context = "\n\n".join([d.page_content for d in docs]) if docs else "Syllabus topic content."
+    query_str = req.subtopic or (db.query(models.Unit.unit_name).filter(
+        models.Unit.faculty_id == fid, models.Unit.unit_number == req.unit_number
+    ).scalar() if req.unit_number else None) or "key concepts"
+    docs, _ = hybrid_search(store, query_str, unit_number=req.unit_number, k=5)
+    context = format_sources(docs) if docs else "Syllabus topic content."
 
     prompt = (
         f"Generate exactly 1 multiple choice question at **{current_diff.upper()}** difficulty level for Unit {req.unit_number}"
         f"{f' on topic: {req.subtopic}' if req.subtopic else ''}.\n"
         "Return ONLY a JSON object with keys: 'question', 'options' (array of 4 strings), 'correct_answer' (must match one option exactly), 'explanation'.\n\n"
-        f"Context:\n{context[:2500]}"
+        f"Sources:\n{context[:4000]}"
     )
 
     try:
@@ -1944,24 +2009,21 @@ def generate_adaptive_quiz_question(
             if raw_text.startswith("json"):
                 raw_text = raw_text[4:]
             raw_text = raw_text.strip()
-        data = json.loads(raw_text)
+        data = parse_llm_json(raw_text)
+        answer = normalize_mcq(data.get("options"), data.get("correct_answer") or data.get("answer"))
+        if not data.get("question") or not answer:
+            raise ValueError("unusable question")
         return schemas.AdaptiveQuizResponse(
             question_number=req.question_number,
             difficulty=current_diff,
-            question=data.get("question", f"Sample question on Unit {req.unit_number}"),
-            options=data.get("options", ["Option A", "Option B", "Option C", "Option D"]),
-            correct_answer=data.get("correct_answer", "Option A"),
-            explanation=data.get("explanation", "Correct based on syllabus definitions.")
+            question=data["question"],
+            options=data["options"],
+            correct_answer=answer,
+            explanation=data.get("explanation", "See your course notes for this topic.")
         )
     except Exception:
-        return schemas.AdaptiveQuizResponse(
-            question_number=req.question_number,
-            difficulty=current_diff,
-            question=f"Which of the following is a primary concept in Unit {req.unit_number}?",
-            options=["Theoretical Foundation", "Practical Application", "Standard Algorithm", "System Evaluation"],
-            correct_answer="Theoretical Foundation",
-            explanation="Theoretical Foundation represents the baseline core of this syllabus unit."
-        )
+        # No placeholder questions: they would be recorded as real attempts and skew mastery
+        raise HTTPException(status_code=503, detail="Couldn't create the next question right now (AI service busy). Please try again.")
 
 
 # ---------------------------------------------------------------------------
@@ -2005,28 +2067,26 @@ def generate_mock_exam(
                 if raw_text.startswith("json"):
                     raw_text = raw_text[4:]
                 raw_text = raw_text.strip()
-            q_list = json.loads(raw_text)
+            q_list = parse_llm_json(raw_text)
 
-            for q in q_list:
+            for q in q_list if isinstance(q_list, list) else []:
+                answer = normalize_mcq(q.get("options"), q.get("correct_answer") or q.get("answer"))
+                if not q.get("question") or not answer:
+                    continue
                 all_questions.append(schemas.MockExamQuestion(
                     id=q_id_counter,
                     unit_number=u_num,
-                    question=q.get("question", f"Unit {u_num} Question {q_id_counter}"),
-                    options=q.get("options", ["A", "B", "C", "D"]),
-                    correct_answer=q.get("correct_answer", "A"),
-                    explanation=q.get("explanation", "Refer to syllabus notes.")
+                    question=q["question"],
+                    options=q["options"],
+                    correct_answer=answer,
+                    explanation=q.get("explanation", "Refer to your course notes.")
                 ))
                 q_id_counter += 1
-        except Exception:
-            all_questions.append(schemas.MockExamQuestion(
-                id=q_id_counter,
-                unit_number=u_num,
-                question=f"What is the fundamental objective of Unit {u_num}?",
-                options=["Understand core concepts", "Analyze data structures", "Implement algorithms", "Evaluate systems"],
-                correct_answer="Understand core concepts",
-                explanation="Core concepts form the primary objective of this unit."
-            ))
-            q_id_counter += 1
+        except Exception as e:
+            print(f"Mock exam generation failed for unit {u_num}: {e}")
+
+    if not all_questions:
+        raise HTTPException(status_code=503, detail="Couldn't create the exam right now (AI service busy). Please try again in a minute.")
 
     exam_id = f"exam_{user.id}_{int(datetime.utcnow().timestamp())}"
 
@@ -2092,12 +2152,19 @@ def submit_mock_exam(
         if u_pct < 60.0:
             weak_units.append(u_num)
 
+    weak_list = ", ".join(f"Unit {u}" for u in sorted(weak_units))
     if score_pct >= 85:
-        ai_feedback = "Outstanding performance! You have demonstrated thorough mastery across all tested units."
+        ai_feedback = "Excellent work. You know these units well; a quick revision before the exam will keep it that way."
     elif score_pct >= 60:
-        ai_feedback = f"Good effort! You passed the mock exam, but should review Unit(s) {', '.join(map(str, weak_units))} before the final test."
+        ai_feedback = (
+            f"You passed. Review {weak_list} before the final exam, then try again." if weak_units
+            else "You passed. Go through the questions you missed below to close the remaining gaps."
+        )
     else:
-        ai_feedback = f"Additional revision recommended. Focus on Unit(s) {', '.join(map(str, weak_units))} and retake practice quizzes."
+        ai_feedback = (
+            f"More revision needed. Start with {weak_list}: read the notes, then take a practice quiz."
+            if weak_units else "More revision needed. Go through the questions you missed below."
+        )
 
     return schemas.MockExamReportResponse(
         total_questions=total_q,
@@ -2312,7 +2379,7 @@ def get_student_insights(
     groups: dict = {}
     for a in attempts:
         topic = (a.topic_query or "").strip()
-        if not topic or topic.lower().startswith(("unit ", "diagnostic")):
+        if not topic or topic.lower().startswith(("unit ", "diagnostic", "mock exam")):
             topic = units.get(a.unit_number, f"Unit {a.unit_number}")
         g = groups.setdefault((a.unit_number, topic), {"total": 0, "correct": 0})
         g["total"] += 1
